@@ -54,7 +54,7 @@ class ProvisionTab(QWidget):
         content = QWidget()
         scroll.setWidget(content)
         root = QVBoxLayout(content)
-
+        '''
         # ══════════════════════════════════════════════════════════════════
         # SECTION 1 — Reader
         # ══════════════════════════════════════════════════════════════════
@@ -83,6 +83,7 @@ class ProvisionTab(QWidget):
         rd_layout.addLayout(card_row)
 
         root.addWidget(rd_box)
+        '''
 
         # ══════════════════════════════════════════════════════════════════
         # SECTION 2 — Card UID
@@ -287,8 +288,8 @@ class ProvisionTab(QWidget):
             self._on_picc_key_type_changed)
 
         # Actions on button clicked in provision tab
-        self.btn_connect.clicked.connect(self.vm.connect_reader)
-        self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
+        #self.btn_connect.clicked.connect(self.vm.connect_reader)
+        #self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_provision.clicked.connect(self._on_provision)
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
@@ -308,10 +309,10 @@ class ProvisionTab(QWidget):
         self.vm.statusChanged.connect(self.status_label.setText)
         self.vm.errorOccurred.connect(
             lambda m: QMessageBox.critical(self, "Error", m))
-        self.vm.readerFound.connect(self.reader_label.setText)
-        self.vm.cardInserted.connect(self._on_card_inserted)
-        self.vm.cardRemoved.connect(self._on_card_removed)
-
+        #self.vm.readerFound.connect(self.reader_label.setText)
+        #self.vm.cardInserted.connect(self._on_card_inserted)
+        #self.vm.cardRemoved.connect(self._on_card_removed)
+    '''
     # ── Card presence ─────────────────────────────────────────────────────
     @Slot(str)
     def _on_card_inserted(self, atr: str):
@@ -326,6 +327,7 @@ class ProvisionTab(QWidget):
         self.atr_edit.clear()
         self.uid_edit.clear()
         self.apps_tree.clear()
+    '''
 
     # ── Applications tree ─────────────────────────────────────────────────
     @Slot(list)

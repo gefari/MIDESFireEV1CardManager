@@ -1,12 +1,10 @@
 from PySide6.QtCore import QObject, Signal, Slot
 from models.license_model import (
-    LicenseCard, LicenseType, LicenseParams, SerialNumber,
-    CommMode, AccessKey, KeyStore,
+    LicenseCard, CommMode,  KeyStore,
     FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM
 )
 from services.card_service import CardService, CardServiceError
-import datetime
-
+from smartcard.System import readers as list_readers
 
 class CardViewModel(QObject):
 
@@ -86,6 +84,14 @@ class CardViewModel(QObject):
 
     def set_app_master_key(self, key_index: int):
         self._app_master_key_index = key_index
+
+    def get_readers(self) -> list[str]:
+        """Return a list of available PC/SC reader names."""
+        try:
+            return [str(r) for r in list_readers()]
+        except Exception as e:
+            self.errorOccurred.emit(f"Could not enumerate readers: {e}")
+            return []
 
     def _get_app_master_key(self) -> bytes:
         key = self._key_store.get(self._app_master_key_index + 1)

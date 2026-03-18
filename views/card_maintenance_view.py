@@ -23,6 +23,7 @@ class CardMaintenanceView(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
+        '''
         # ── Reader Discovery ───────────────────────────────────────────
         rd_box = QGroupBox("Reader")
         rd_layout = QVBoxLayout(rd_box)
@@ -52,7 +53,7 @@ class CardMaintenanceView(QWidget):
         rd_layout.addLayout(card_row)
 
         root.addWidget(rd_box)
-
+        '''
         # ── Card UID ───────────────────────────────────────────────
         uid_box = QGroupBox("Card UID")
         uid_row = QHBoxLayout(uid_box)
@@ -146,20 +147,20 @@ class CardMaintenanceView(QWidget):
 
 
     def _connect_signals(self):
-        self.btn_find.clicked.connect(self.vm.find_reader)
-        self.btn_connect.clicked.connect(self.vm.connect_reader)
-        self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
+        #self.btn_find.clicked.connect(self.vm.find_reader)
+        #self.btn_connect.clicked.connect(self.vm.connect_reader)
+        #self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
 
-        self.vm.readerFound.connect(self.reader_label.setText)
+        #self.vm.readerFound.connect(self.reader_label.setText)
         self.vm.uidRead.connect(self.uid_edit.setText)
         self.vm.statusChanged.connect(self._log)
         self.vm.errorOccurred.connect(lambda m: self._log(f"ERROR: {m}"))
 
         # Card presence
-        self.vm.cardInserted.connect(self._on_card_inserted)
-        self.vm.cardRemoved.connect(self._on_card_removed)
+        #self.vm.cardInserted.connect(self._on_card_inserted)
+        #self.vm.cardRemoved.connect(self._on_card_removed)
 
         self.btn_read_apps.clicked.connect(self._on_read_apps)
         self.vm.appsRead.connect(self._populate_apps)
@@ -175,7 +176,7 @@ class CardMaintenanceView(QWidget):
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
 
         #self.btn_clear_log.clicked.connect(self.log_box.clear)
-
+    '''
     @Slot(str)
     def _on_card_inserted(self, atr: str):
         self.card_status_label.setText("🟢  Card present")
@@ -190,7 +191,7 @@ class CardMaintenanceView(QWidget):
         self.atr_edit.clear()
         self.uid_edit.clear()
         self._log("Card removed.")
-
+    '''
     @Slot()
     def _on_erase(self):
         confirm = QMessageBox.question(
