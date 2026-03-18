@@ -97,6 +97,10 @@ class CardViewModel(QObject):
         key = self._key_store.get(self._app_master_key_index + 1)
         return key.key_bytes if key else None
 
+    def stop(self):
+        """Public shutdown hook — stops the card monitor thread."""
+        self._service.stop_monitor()
+
     # ── Key store ─────────────────────────────────────────────────────────
     @property
     def key_store(self) -> KeyStore:

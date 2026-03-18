@@ -23,37 +23,6 @@ class CardMaintenanceView(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
-        '''
-        # ── Reader Discovery ───────────────────────────────────────────
-        rd_box = QGroupBox("Reader")
-        rd_layout = QVBoxLayout(rd_box)
-
-        rd_row = QHBoxLayout()
-
-        self.btn_find = QPushButton("Find uTrust 3720F HF")
-        self.btn_connect = QPushButton("Connect")
-        self.btn_disconnect = QPushButton("Disconnect")
-        self.reader_label = QLabel("—")
-        rd_row.addWidget(self.btn_find)
-        rd_row.addWidget(self.btn_connect)
-        rd_row.addWidget(self.btn_disconnect)
-        rd_row.addWidget(self.reader_label)
-        rd_row.addStretch()
-        rd_layout.addLayout(rd_row)
-
-        # Card presence indicator
-        card_row = QHBoxLayout()
-        self.card_status_label = QLabel("⬜  No card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: gray;")
-        self.atr_edit = QLineEdit()
-        self.atr_edit.setReadOnly(True)
-        self.atr_edit.setPlaceholderText("ATR")
-        card_row.addWidget(self.card_status_label)
-        card_row.addWidget(self.atr_edit)
-        rd_layout.addLayout(card_row)
-
-        root.addWidget(rd_box)
-        '''
         # ── Card UID ───────────────────────────────────────────────
         uid_box = QGroupBox("Card UID")
         uid_row = QHBoxLayout(uid_box)
@@ -129,69 +98,27 @@ class CardMaintenanceView(QWidget):
         erase_row.addWidget(self.btn_erase)
         erase_row.addStretch()
         root.addWidget(erase_box)
-
-        '''
-        # ── Log ────────────────────────────────────────────────────
-        log_header_row = QHBoxLayout()
-        log_label = QLabel("Log:")
-        self.btn_clear_log = QPushButton("Clear Log")
-        self.btn_clear_log.setFixedWidth(80)
-        log_header_row.addWidget(log_label)
-        log_header_row.addStretch()
-        log_header_row.addWidget(self.btn_clear_log)
-        root.addLayout(log_header_row)
-        '''
         self.log_box = QTextEdit()
-        #self.log_box.setReadOnly(True)
-        #root.addWidget(self.log_box)
 
 
     def _connect_signals(self):
-        #self.btn_find.clicked.connect(self.vm.find_reader)
-        #self.btn_connect.clicked.connect(self.vm.connect_reader)
-        #self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
+        # Buttons Action
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
-
-        #self.vm.readerFound.connect(self.reader_label.setText)
+        self.btn_read_apps.clicked.connect(self._on_read_apps)
+        self.btn_auth_picc.clicked.connect(self._on_auth_picc)
+        # View model signals
         self.vm.uidRead.connect(self.uid_edit.setText)
         self.vm.statusChanged.connect(self._log)
         self.vm.errorOccurred.connect(lambda m: self._log(f"ERROR: {m}"))
-
-        # Card presence
-        #self.vm.cardInserted.connect(self._on_card_inserted)
-        #self.vm.cardRemoved.connect(self._on_card_removed)
-
-        self.btn_read_apps.clicked.connect(self._on_read_apps)
         self.vm.appsRead.connect(self._populate_apps)
-
-        self.btn_read_apps.clicked.connect(self._on_read_apps)
         self.vm.appsRead.connect(self._populate_apps)
         self.vm.appDeleted.connect(self._on_app_deleted)
         self.vm.logMessage.connect(self._log)
-
-        self.btn_auth_picc.clicked.connect(self._on_auth_picc)
         self.vm.authResult.connect(self._on_auth_result)
-
+        # key type combo box
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
 
-        #self.btn_clear_log.clicked.connect(self.log_box.clear)
-    '''
-    @Slot(str)
-    def _on_card_inserted(self, atr: str):
-        self.card_status_label.setText("🟢  Card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: green;")
-        self.atr_edit.setText(atr)
-        self._log(f"Card inserted — ATR: {atr}")
-
-    @Slot()
-    def _on_card_removed(self):
-        self.card_status_label.setText("⬜  No card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: gray;")
-        self.atr_edit.clear()
-        self.uid_edit.clear()
-        self._log("Card removed.")
-    '''
     @Slot()
     def _on_erase(self):
         confirm = QMessageBox.question(
@@ -239,13 +166,11 @@ class CardMaintenanceView(QWidget):
 
         for entry in apps:
             aid = entry["aid"]
-            label = aid + ("  ← MC3" if aid.upper() == "010203" else "")
+            label = aid
 
             # Top-level AID row
             app_item = QTreeWidgetItem([label, "", "", "", "", "", "", "", ""])
-            if aid.upper() == "010203":
-                for col in range(8):
-                    app_item.setForeground(col, QColor("darkgreen"))
+
             app_item.setExpanded(True)
             self.apps_tree.addTopLevelItem(app_item)
 
@@ -280,7 +205,6 @@ class CardMaintenanceView(QWidget):
                 app_item.addChild(child)
 
         self.apps_tree.expandAll()
-        #self._log(f"Applications loaded: {[e['aid'] for e in apps]}")
 
     @Slot(str)
     def _on_delete_app(self, aid: str):

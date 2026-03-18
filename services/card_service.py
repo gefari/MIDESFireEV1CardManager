@@ -405,24 +405,23 @@ class CardService:
         Full provision sequence with step-by-step logging.
         access_rights: {file_id: (read_nibble, write_nibble)}
         """
-        log("── Provision Start ──────────────────────────────")
-
+        self._log("── Provision Start ──────────────────────────────")
         # ── Step 1: Select PICC master app ───────────────────────
-        log("Step 1: SelectApplication(000000) — PICC master")
+        self._log("Step 1: SelectApplication(000000) — PICC master")
         self.select_app(bytes([0x00, 0x00, 0x00]))
-        log("        OK")
+        self._log("        OK")
 
         # ── Step 2: Create application ───────────────────────────
         aid_hex = app_id.hex().upper()
-        log(f"Step 2: CreateApplication(AID={aid_hex}, "
+        self._log(f"Step 2: CreateApplication(AID={aid_hex}, "
             f"KeySettings=0x{key_settings:02X}, NumKeys=5)")
         self.create_app(app_id, key_settings, num_keys=5)
         log("        OK")
 
         # ── Step 3: Select new application ───────────────────────
-        log(f"Step 3: SelectApplication({aid_hex})")
+        self._log(f"Step 3: SelectApplication({aid_hex})")
         self.select_app(app_id)
-        log("        OK")
+        self._log("        OK")
 
         # ── Step 4–7: Create files ───────────────────────────────
         file_specs = [
@@ -434,16 +433,16 @@ class CardService:
         for file_id, name, size in file_specs:
             read_n, write_n = access_rights[file_id]
             ar = self._build_ar(read_n, write_n, 0xF, 0x0)
-            log(f"Step {file_id + 3}: CreateStdDataFile("
+            self._log(f"Step {file_id + 3}: CreateStdDataFile("
                 f"ID=0x{file_id:02X}, '{name}', "
                 f"Size={size}B, "
                 f"CommMode={comm_mode.name}, "
                 f"AR=0x{ar:04X} "
                 f"[R=0x{read_n:X} W=0x{write_n:X}])")
             self._create_std_file(file_id, comm_mode, ar, size)
-            log(f"        OK")
+            self._log(f"        OK")
 
-        log("── Provision Complete ───────────────────────────")
+        self._log("── Provision Complete ───────────────────────────")
     def select_app(self, app_id: bytes = APP_ID):
         resp, sw1, sw2 = self._transmit(_apdu(INS_SELECT_APP, app_id[::-1]))
         if not _ok(sw1, sw2):

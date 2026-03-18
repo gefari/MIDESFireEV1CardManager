@@ -1,9 +1,7 @@
-# _main.py — full replacement
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QSplitter,
                                QTextEdit, QLabel, QVBoxLayout, QWidget,
-                               QGroupBox, QGridLayout, QPushButton, QComboBox,
-                               QHBoxLayout)
+                               QGroupBox, QGridLayout, QPushButton)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from viewmodels.card_viewmodel import CardViewModel
@@ -16,7 +14,7 @@ from views.card_database_view import CardDatabaseView
 class MainWindow(QMainWindow):
     def __init__(self, app: QApplication):
         super().__init__()
-        self.setWindowTitle("MC3 License Card Application")
+        self.setWindowTitle("MI DES Fire EV1 Card Manager")
         self.resize(1200, 900)
 
         self.vm     = CardViewModel()
@@ -96,8 +94,6 @@ class MainWindow(QMainWindow):
 
         # ── NFC signal wiring ─────────────────────────────────────────────
         self.btn_refresh_readers.clicked.connect(self._find_reader)
-        #self.btn_connect.clicked.connect(self._connect_reader)
-        #self.btn_disconnect.clicked.connect(self._disconnect_reader)
         self.vm.cardInserted.connect(self._on_card_inserted)
         self.vm.cardRemoved.connect(self._on_card_removed)
         self.vm.readerFound.connect(self._on_reader_found)
@@ -108,7 +104,7 @@ class MainWindow(QMainWindow):
         self.vm.errorOccurred.connect(lambda m: self.log_text.append(f"❌ ERROR: {m}"))
 
         # Graceful shutdown
-        #app.aboutToQuit.connect(self.vm._service.stop_monitor)
+        app.aboutToQuit.connect(self.vm.stop)
 
         # Populate readers on startup
         self.vm.find_reader()
@@ -119,18 +115,15 @@ class MainWindow(QMainWindow):
 
     def _disconnect_reader(self):
         self.vm.disconnect_reader()              # expected VM method
-        #self.btn_connect.setEnabled(True)
-        #self.btn_disconnect.setEnabled(False)
         self.lbl_card_status.setText("No card detected")
         self.lbl_card_status.setStyleSheet("color: gray; font-style: italic;")
-        #self.lbl_card_atr.setText("—")
 
     def _on_card_inserted(self, atr: str):
         self.lbl_card_status.setText("✅ Card present")
         self.lbl_card_status.setStyleSheet("color: green; font-weight: bold;")
-        DESFIRE_ATR = "3B 81 80 01 80 80"
-        if atr.upper() == DESFIRE_ATR:
-            self.lbl_card_type.setText(f"DESFire EV1 card detected")
+        DESFIRE_ATR_PREFIX = "3B8180"
+        if atr.replace(" ", "").upper().startswith(DESFIRE_ATR_PREFIX):
+            self.lbl_card_type.setText("DESFire EV1 card detected")
             self.vm.connect_reader()
         else:
             self.lbl_card_type.setText(f"⚠ Unknown card type")

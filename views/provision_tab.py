@@ -54,39 +54,9 @@ class ProvisionTab(QWidget):
         content = QWidget()
         scroll.setWidget(content)
         root = QVBoxLayout(content)
-        '''
-        # ══════════════════════════════════════════════════════════════════
-        # SECTION 1 — Reader
-        # ══════════════════════════════════════════════════════════════════
-        rd_box = QGroupBox("Reader")
-        rd_layout = QVBoxLayout(rd_box)
-
-        rd_row = QHBoxLayout()
-        self.btn_connect    = QPushButton("Connect")
-        self.btn_disconnect = QPushButton("Disconnect")
-        self.reader_label   = QLabel("—")
-        rd_row.addWidget(self.btn_connect)
-        rd_row.addWidget(self.btn_disconnect)
-        rd_row.addWidget(self.reader_label)
-        rd_row.addStretch()
-        rd_layout.addLayout(rd_row)
-
-        card_row = QHBoxLayout()
-        self.card_status_label = QLabel("⬜  No card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: gray;")
-        self.atr_edit = QLineEdit()
-        self.atr_edit.setReadOnly(True)
-        self.atr_edit.setPlaceholderText("ATR")
-        self.atr_edit.setFont(mono_font())
-        card_row.addWidget(self.card_status_label)
-        card_row.addWidget(self.atr_edit)
-        rd_layout.addLayout(card_row)
-
-        root.addWidget(rd_box)
-        '''
 
         # ══════════════════════════════════════════════════════════════════
-        # SECTION 2 — Card UID
+        # SECTION 1 — Card UID
         # ══════════════════════════════════════════════════════════════════
         uid_box = QGroupBox("Card UID")
         uid_row = QHBoxLayout(uid_box)
@@ -100,7 +70,7 @@ class ProvisionTab(QWidget):
         root.addWidget(uid_box)
 
         # ══════════════════════════════════════════════════════════════════
-        # SECTION 3 — PICC MAster Key
+        # SECTION 2 — PICC MAster Key
         # ══════════════════════════════════════════════════════════════════
         picc_master_key_box = QGroupBox("PICC Master Key")
         master_key_layout = QVBoxLayout(picc_master_key_box)
@@ -180,7 +150,7 @@ class ProvisionTab(QWidget):
         root.addWidget(chg_box)
 
         # ══════════════════════════════════════════════════════════════════
-        # SECTION 4 — Provision settings  (unchanged from original)
+        # SECTION 3 — Provision settings  (unchanged from original)
         # ══════════════════════════════════════════════════════════════════
         access_box = QGroupBox("Access Mode")
         access_form = QFormLayout(access_box)
@@ -247,18 +217,6 @@ class ProvisionTab(QWidget):
         self.status_label = QLabel("Ready.")
         root.addWidget(self.status_label)
 
-        log_header_row = QHBoxLayout()
-        log_label = QLabel("Provision log:")
-        self.btn_clear_log = QPushButton("Clear Log")
-        self.btn_clear_log.setFixedWidth(80)
-        log_header_row.addWidget(log_label)
-        log_header_row.addStretch()
-        log_header_row.addWidget(self.btn_clear_log)
-        self.provision_log = QTextEdit()
-
-        root.addLayout(log_header_row)  # replaces root.addWidget(log_label)
-        root.addWidget(self.provision_log)
-
         root.addStretch()
 
         self.apps_tree = QTreeWidget()
@@ -288,46 +246,23 @@ class ProvisionTab(QWidget):
             self._on_picc_key_type_changed)
 
         # Actions on button clicked in provision tab
-        #self.btn_connect.clicked.connect(self.vm.connect_reader)
-        #self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_provision.clicked.connect(self._on_provision)
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
         self.btn_copy_picc_to_db.clicked.connect(self._on_copy_picc_to_db)
         self.btn_fill_new_key.clicked.connect(self._on_fill_new_key)
         self.btn_change_key.clicked.connect(self._on_change_key)
-        self.btn_clear_log.clicked.connect(self.provision_log.clear)
 
         # Connect provision to view model signal
         self.vm.uidRead.connect(self.uid_edit.setText)
         self.vm.keyStoreChanged.connect(self._refresh_key_combos)
         self.vm.appsRead.connect(self._populate_apps)
-        self.vm.provisionLog.connect(self.provision_log.append)
         self.vm.authResult.connect(self._on_auth_result)
         self.vm.keyChanged.connect(self._on_key_changed)
         self.vm.keyStoreChanged.connect(self._on_keys_changed)
         self.vm.statusChanged.connect(self.status_label.setText)
         self.vm.errorOccurred.connect(
             lambda m: QMessageBox.critical(self, "Error", m))
-        #self.vm.readerFound.connect(self.reader_label.setText)
-        #self.vm.cardInserted.connect(self._on_card_inserted)
-        #self.vm.cardRemoved.connect(self._on_card_removed)
-    '''
-    # ── Card presence ─────────────────────────────────────────────────────
-    @Slot(str)
-    def _on_card_inserted(self, atr: str):
-        self.card_status_label.setText("🟢  Card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: green;")
-        self.atr_edit.setText(atr)
-
-    @Slot()
-    def _on_card_removed(self):
-        self.card_status_label.setText("⬜  No card present")
-        self.card_status_label.setStyleSheet("font-weight: bold; color: gray;")
-        self.atr_edit.clear()
-        self.uid_edit.clear()
-        self.apps_tree.clear()
-    '''
 
     # ── Applications tree ─────────────────────────────────────────────────
     @Slot(list)
@@ -340,11 +275,8 @@ class ProvisionTab(QWidget):
             return
         for entry in apps:
             aid = entry["aid"]
-            label = aid + ("  ← MC3" if aid.upper() == "010203" else "")
+            label = aid
             app_item = QTreeWidgetItem([label, "", "", "", "", "", "", ""])
-            if aid.upper() == "010203":
-                for col in range(8):
-                    app_item.setForeground(col, QColor("darkgreen"))
             app_item.setExpanded(True)
             self.apps_tree.addTopLevelItem(app_item)
             for fs in entry["files"]:
@@ -414,15 +346,18 @@ class ProvisionTab(QWidget):
     def _on_auth_picc(self):
         picc_key_hex = self.picc_key_edit.text().replace(" ", "")
         key_type = self.picc_key_type_combo.currentText()
-        self.provision_log.append(f"Authenticating PICC ({key_type}): {picc_key_hex}")
+        msg = (f"Authenticating PICC ({key_type}): {picc_key_hex}")
+        #self.provision_log.append
         self.vm.test_authentication_picc(picc_key_hex)
 
     @Slot(bool, str)
     def _on_auth_result(self, success: bool, msg: str):
         if success:
-            self.provision_log.append(f"✅ {msg}")
+            msg = f"✅ {msg}"
+            #self.provision_log.append(f"✅ {msg}")
         else:
-            self.provision_log.append(f"❌ {msg}")
+            msg = f"❌ {msg}"
+            #self.provision_log.append(f"❌ {msg}")
 
     @Slot(int)
     def _on_picc_key_type_changed(self, index: int):
@@ -447,10 +382,12 @@ class ProvisionTab(QWidget):
             item = QTableWidgetItem(picc_hex)
             item.setFont(mono_font())
             self.db_view.table.setItem(row, self.db_view.COL["picc_master_key"], item)
+
             self.status_label.setText("PICC master key written to selected DB row.")
         else:
             # No row selected — create a new row with just the PICC key filled
             self.db_view.copy_keys_to_new_row(picc_key_hex=picc_hex)
+
             self.status_label.setText("PICC master key copied to new DB row.")
 
     @Slot()

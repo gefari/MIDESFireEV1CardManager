@@ -91,21 +91,6 @@ class AccessKeyView(QWidget):
         root.addWidget(self.status_label)
         root.addStretch()
 
-    def _mono_font(self):
-        from PySide6.QtGui import QFont
-        f = QFont("Courier New", 10)
-        f.setFixedPitch(True)
-        return f
-
-    def _connect_signals(self):
-        self.btn_gen_all.clicked.connect(self.vm.generate_all_keys)
-        self.vm.keyStoreChanged.connect(self._refresh_keys)
-        self.vm.statusChanged.connect(self.status_label.setText)
-        self.vm.errorOccurred.connect(
-            lambda m: QMessageBox.critical(self, "Key Error", m)
-        )
-        self.btn_copy_to_db.clicked.connect(self._on_copy_to_db)
-
     @Slot()
     def _on_copy_to_db(self):
         self.db_view.copy_keys_to_new_row(picc_key_hex="")
@@ -127,3 +112,20 @@ class AccessKeyView(QWidget):
         edit.setMaxLength(int(key_type) * 2)
         edit.setPlaceholderText(f"{int(key_type) * 2} hex characters")
         self.vm.keyStoreChanged.emit()
+
+    def _mono_font(self):
+        from PySide6.QtGui import QFont
+        f = QFont("Courier New", 10)
+        f.setFixedPitch(True)
+        return f
+
+    def _connect_signals(self):
+        # Button Action
+        self.btn_gen_all.clicked.connect(self.vm.generate_all_keys)
+        self.btn_copy_to_db.clicked.connect(self._on_copy_to_db)
+        # View model signals
+        self.vm.keyStoreChanged.connect(self._refresh_keys)
+        self.vm.statusChanged.connect(self.status_label.setText)
+        self.vm.errorOccurred.connect(
+            lambda m: QMessageBox.critical(self, "Key Error", m)
+        )
