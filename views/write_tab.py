@@ -40,6 +40,16 @@ class WriteTab(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
+        # ── Application ID ─────────────────────────────────────────
+        app_box = QGroupBox("Application")
+        app_form = QFormLayout(app_box)
+        self.app_id_edit = QLineEdit("010203")
+        self.app_id_edit.setMaxLength(6)
+        self.app_id_edit.setFont(mono_font())
+        self.app_id_edit.setPlaceholderText("6 hex chars  e.g. 010203")
+        app_form.addRow("Application ID (hex):", self.app_id_edit)
+        root.addWidget(app_box)
+
         # ── File 1 – Serial ────────────────────────────────────────
         sn_box = QGroupBox("File 1 – License Serial Number")
         sn_form = QFormLayout(sn_box)
@@ -78,22 +88,32 @@ class WriteTab(QWidget):
         self.params_box = QGroupBox("File 3 – License Parameters")
         p_form = QFormLayout(self.params_box)
 
-        self.exp_label     = QLabel("Expiration:")
+        # Perpetual — validity flag
+        self.valid_label = QLabel("Valid:")
+        self.valid_combo = QComboBox()
+        self.valid_combo.addItems(["1 – Valid", "0 – Invalid"])
+        self.valid_combo.setCurrentIndex(0)
+        self.valid_combo.currentIndexChanged.connect(self._update_checksum)
+
+        # Time Limited — expiration date
+        self.exp_label = QLabel("Expiration:")
         self.exp_date_edit = QDateTimeEdit(QDateTime.currentDateTimeUtc())
-        self.exp_date_edit.setDisplayFormat("yyyy/MM/dd HH:mm:ss")   # ← 4-digit year fix
+        self.exp_date_edit.setDisplayFormat("yyyy/MM/dd HH:mm:ss")
         self.exp_date_edit.setCalendarPopup(True)
 
+        # Per Use — use count + hours
         self.num_uses_label = QLabel("Number of uses:")
-        self.num_uses_spin  = QSpinBox()
+        self.num_uses_spin = QSpinBox()
         self.num_uses_spin.setRange(0, 65535)
 
         self.hours_label = QLabel("Hours per use:")
-        self.hours_spin  = QSpinBox()
+        self.hours_spin = QSpinBox()
         self.hours_spin.setRange(0, 65535)
 
-        p_form.addRow(self.exp_label,      self.exp_date_edit)
+        p_form.addRow(self.valid_label, self.valid_combo)
+        p_form.addRow(self.exp_label, self.exp_date_edit)
         p_form.addRow(self.num_uses_label, self.num_uses_spin)
-        p_form.addRow(self.hours_label,    self.hours_spin)
+        p_form.addRow(self.hours_label, self.hours_spin)
         root.addWidget(self.params_box)
 
         # ── File 4 – Checksum ──────────────────────────────────────
@@ -128,6 +148,7 @@ class WriteTab(QWidget):
         self.hours_spin.valueChanged.connect(self._update_checksum)
 
         self.btn_write.clicked.connect(self._on_write)
+        self.valid_combo.currentIndexChanged.connect(self._update_checksum)
 
         # ViewModel signals
         self.vm.statusChanged.connect(self.status_label.setText)
@@ -150,13 +171,22 @@ class WriteTab(QWidget):
 
     @Slot(int)
     def _refresh_param_visibility(self, idx: int):
-        """Show only the parameter widgets relevant to the selected license type."""
-        self.exp_label.setVisible(idx == LicenseType.TIME_LIMITED)
-        self.exp_date_edit.setVisible(idx == LicenseType.TIME_LIMITED)
-        self.num_uses_label.setVisible(idx == LicenseType.PER_USE)
-        self.num_uses_spin.setVisible(idx == LicenseType.PER_USE)
-        self.hours_label.setVisible(idx == LicenseType.PER_USE)
-        self.hours_spin.setVisible(idx == LicenseType.PER_USE)
+        is_perpetual = idx == LicenseType.PERPETUAL
+        is_time_limited = idx == LicenseType.TIME_LIMITED
+        is_per_use = idx == LicenseType.PER_USE
+
+        self.params_box.setVisible(True)  # always show File 3
+
+        self.valid_label.setVisible(is_perpetual)
+        self.valid_combo.setVisible(is_perpetual)
+
+        self.exp_label.setVisible(is_time_limited)
+        self.exp_date_edit.setVisible(is_time_limited)
+
+        self.num_uses_label.setVisible(is_per_use)
+        self.num_uses_spin.setVisible(is_per_use)
+        self.hours_label.setVisible(is_per_use)
+        self.hours_spin.setVisible(is_per_use)
 
     @Slot()
     def _update_checksum(self):
@@ -167,11 +197,6 @@ class WriteTab(QWidget):
     # ── Card construction ──────────────────────────────────────────────────────
 
     def _build_card_from_ui(self) -> LicenseCard:
-        """
-        Build a LicenseCard from the current UI state.
-        Falls back to utcnow() if the serial field cannot be parsed,
-        and sets the checksum on the returned card.
-        """
         raw_serial = self.serial_edit.text().strip()
         try:
             dt = datetime.datetime.strptime(raw_serial, "%y%m%d%H%M%S")
@@ -179,12 +204,14 @@ class WriteTab(QWidget):
             dt = datetime.datetime.utcnow()
 
         serial = SerialNumber(dt=dt)
-        lt     = LicenseType(self.license_type_combo.currentIndex())
+        lt = LicenseType(self.license_type_combo.currentIndex())
 
         if lt == LicenseType.PERPETUAL:
-            params = LicenseParams(license_type=lt)
+            # valid_combo index 0 = Valid (1), index 1 = Invalid (0)
+            is_valid = self.valid_combo.currentIndex() == 0
+            params = LicenseParams(license_type=lt, valid=is_valid)
         elif lt == LicenseType.TIME_LIMITED:
-            qdt    = self.exp_date_edit.dateTime().toPython()
+            qdt = self.exp_date_edit.dateTime().toPython()
             params = LicenseParams(license_type=lt, expiration=qdt)
         else:  # PER_USE
             params = LicenseParams(
@@ -193,14 +220,13 @@ class WriteTab(QWidget):
                 hours_per_use=self.hours_spin.value(),
             )
 
-        card          = LicenseCard(serial=serial, license_type=lt,
-                                    params=params, comm_mode=CommMode.PLAIN)
+        card = LicenseCard(serial=serial, license_type=lt,
+                           params=params, comm_mode=CommMode.PLAIN)
         card.checksum = card.compute_checksum()
         return card
 
     @Slot()
     def _on_write(self):
-        """Validate, build card, connect to reader, and write."""
         raw_serial = self.serial_edit.text().strip()
         if len(raw_serial) != 12 or not raw_serial.isdigit():
             QMessageBox.warning(
@@ -209,10 +235,16 @@ class WriteTab(QWidget):
             )
             return
 
+        app_id = self.app_id_edit.text().strip()
+        if len(app_id) != 6:
+            QMessageBox.warning(
+                self, "Invalid App ID",
+                f"Application ID must be exactly 6 hex chars.\nGot: '{app_id}'"
+            )
+            return
+
         card = self._build_card_from_ui()
         self.vm.update_card(card)
+        self.vm.connect_reader()
+        self.vm.write_card(app_id)
 
-        if not self.vm.connect_reader():
-            return   # ViewModel emits errorOccurred; _on_write stops here
-
-        self.vm.write_card()

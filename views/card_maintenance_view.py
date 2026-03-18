@@ -1,16 +1,18 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QGroupBox,
-    QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QComboBox,
+    QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QComboBox, QHeaderView,
 )
 from PySide6.QtCore import Slot
 from viewmodels.card_viewmodel import CardViewModel
 from PySide6.QtGui import QFont, QColor
 
+
 def mono_font() -> QFont:
     f = QFont("Courier New", 10)
     f.setFixedPitch(True)
     return f
+
 
 class CardMaintenanceView(QWidget):
     def __init__(self, viewmodel: CardViewModel, parent=None):
@@ -26,8 +28,8 @@ class CardMaintenanceView(QWidget):
         # ── Card UID ───────────────────────────────────────────────
         uid_box = QGroupBox("Card UID")
         uid_row = QHBoxLayout(uid_box)
-        self.btn_uid   = QPushButton("Read UID")
-        self.uid_edit  = QLineEdit()
+        self.btn_uid  = QPushButton("Read UID")
+        self.uid_edit = QLineEdit()
         self.uid_edit.setReadOnly(True)
         uid_row.addWidget(self.btn_uid)
         uid_row.addWidget(self.uid_edit)
@@ -49,7 +51,7 @@ class CardMaintenanceView(QWidget):
         self.picc_key_type_combo.setFixedWidth(130)
 
         self.picc_key_edit = QLineEdit("0000000000000000")
-        self.picc_key_edit.setMaxLength(16)  # DES default
+        self.picc_key_edit.setMaxLength(16)
         self.picc_key_edit.setFont(mono_font())
         self.picc_key_edit.setFixedWidth(260)
         self.picc_key_edit.setPlaceholderText("16 hex chars (DES)")
@@ -79,11 +81,29 @@ class CardMaintenanceView(QWidget):
         app_btn_row.addStretch()
         app_layout.addLayout(app_btn_row)
 
+        # ── Tree — initialized with all 10 columns upfront ────────────────
         self.apps_tree = QTreeWidget()
-        self.apps_tree.setHeaderLabels(["AID", "Files", ""])
-        self.apps_tree.setColumnWidth(0, 180)
-        self.apps_tree.setColumnWidth(1, 200)
-        self.apps_tree.setColumnWidth(2, 80)
+        self.apps_tree.setHeaderLabels([
+            "AID / File", "Type", "Comm Mode",
+            "Size", "Read", "Write", "R/W", "Change", "Value", ""
+        ])
+
+        # Column 0 stretches to fill spare space; all others are fixed
+        header = self.apps_tree.header()
+        header.setStretchLastSection(True)
+        for col in range(0, 10):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+
+        self.apps_tree.setColumnWidth(0, 80) # "AID / File"
+        self.apps_tree.setColumnWidth(1, 70) # "Type"
+        self.apps_tree.setColumnWidth(2, 80) # "Comm Mode"
+        self.apps_tree.setColumnWidth(3, 50) # "Size"
+        self.apps_tree.setColumnWidth(4, 55) # "Read"
+        self.apps_tree.setColumnWidth(5, 55) # "Write"
+        self.apps_tree.setColumnWidth(6, 45) # "R/W"
+        self.apps_tree.setColumnWidth(7, 55) # "Change"
+        self.apps_tree.setColumnWidth(8, 200) # "Value"
+        self.apps_tree.setColumnWidth(9, 80) # ""
         self.apps_tree.setMinimumHeight(150)
         self.apps_tree.setAlternatingRowColors(True)
         app_layout.addWidget(self.apps_tree)
@@ -98,25 +118,21 @@ class CardMaintenanceView(QWidget):
         erase_row.addWidget(self.btn_erase)
         erase_row.addStretch()
         root.addWidget(erase_box)
+
         self.log_box = QTextEdit()
 
-
     def _connect_signals(self):
-        # Buttons Action
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
         self.btn_read_apps.clicked.connect(self._on_read_apps)
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
-        # View model signals
         self.vm.uidRead.connect(self.uid_edit.setText)
         self.vm.statusChanged.connect(self._log)
         self.vm.errorOccurred.connect(lambda m: self._log(f"ERROR: {m}"))
         self.vm.appsRead.connect(self._populate_apps)
-        self.vm.appsRead.connect(self._populate_apps)
         self.vm.appDeleted.connect(self._on_app_deleted)
         self.vm.logMessage.connect(self._log)
         self.vm.authResult.connect(self._on_auth_result)
-        # key type combo box
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
 
     @Slot()
@@ -135,28 +151,14 @@ class CardMaintenanceView(QWidget):
     def _log(self, msg: str):
         self.log_box.append(msg)
 
-
     @Slot()
     def _on_read_apps(self):
-        self.vm.connect_reader()
+        #self.vm.connect_reader()
         self.vm.read_applications()
 
     @Slot(list)
     def _populate_apps(self, apps: list):
-        self.apps_tree.clear()
-        self.apps_tree.setHeaderLabels([
-            "AID / File", "Type", "Comm Mode",
-            "Size", "Read", "Write", "R/W", "Change", ""
-        ])
-        self.apps_tree.setColumnWidth(0, 160)
-        self.apps_tree.setColumnWidth(1, 70)
-        self.apps_tree.setColumnWidth(2, 80)
-        self.apps_tree.setColumnWidth(3, 50)
-        self.apps_tree.setColumnWidth(4, 55)
-        self.apps_tree.setColumnWidth(5, 55)
-        self.apps_tree.setColumnWidth(6, 45)
-        self.apps_tree.setColumnWidth(7, 55)
-        self.apps_tree.setColumnWidth(8, 75)
+        self.apps_tree.clear()   # clears rows only — headers and column widths are preserved
 
         if not apps:
             self.apps_tree.addTopLevelItem(
@@ -166,29 +168,27 @@ class CardMaintenanceView(QWidget):
 
         for entry in apps:
             aid = entry["aid"]
-            label = aid
 
-            # Top-level AID row
-            app_item = QTreeWidgetItem([label, "", "", "", "", "", "", "", ""])
-
+            # ── Top-level AID row ─────────────────────────────────
+            app_item = QTreeWidgetItem([aid, "", "", "", "", "", "", "", "", ""])
             app_item.setExpanded(True)
             self.apps_tree.addTopLevelItem(app_item)
 
-            # Delete button on AID row
+            # Delete button — column 9 is always available now
             btn_delete = QPushButton("🗑 Delete")
             btn_delete.setFixedWidth(75)
             btn_delete.setStyleSheet("color: red;")
             btn_delete.clicked.connect(
                 lambda checked=False, a=aid: self._on_delete_app(a)
             )
-            self.apps_tree.setItemWidget(app_item, 8, btn_delete)
+            self.apps_tree.setItemWidget(app_item, 9, btn_delete)
 
-            # Child rows — one per file
+            # ── Child rows — one per file ─────────────────────────
             for fs in entry["files"]:
                 if fs.get("error"):
                     child = QTreeWidgetItem([
                         f"  File 0x{fs['file_id']:02X}",
-                        "Error", "", "", "", "", "", "", ""
+                        "Error", "", "", "", "", "", "", "", ""
                     ])
                 else:
                     child = QTreeWidgetItem([
@@ -200,6 +200,7 @@ class CardMaintenanceView(QWidget):
                         fs["write"],
                         fs["rw"],
                         fs["change"],
+                        fs.get("value", ""),
                         "",
                     ])
                 app_item.addChild(child)
@@ -221,7 +222,6 @@ class CardMaintenanceView(QWidget):
     @Slot(str)
     def _on_app_deleted(self, aid: str):
         self._log(f"Application {aid} deleted.")
-        # Refresh the list automatically
         self.vm.connect_reader()
         self.vm.read_applications()
 
@@ -241,12 +241,11 @@ class CardMaintenanceView(QWidget):
 
     @Slot(int)
     def _on_picc_key_type_changed(self, index: int):
-        hex_len = self.picc_key_type_combo.currentData() * 2  # bytes → hex chars
+        hex_len = self.picc_key_type_combo.currentData() * 2
         labels = {16: "16 hex chars (DES)",
                   32: "32 hex chars (2K3DES / AES)",
                   48: "48 hex chars (3K3DES)"}
         self.picc_key_edit.setMaxLength(hex_len)
         self.picc_key_edit.setPlaceholderText(labels.get(hex_len, f"{hex_len} hex chars"))
-        # Pad or truncate current value to new length
         current = self.picc_key_edit.text().ljust(hex_len, '0')[:hex_len]
         self.picc_key_edit.setText(current)

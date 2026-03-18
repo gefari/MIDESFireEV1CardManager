@@ -7,28 +7,43 @@ from views.provision_tab import ProvisionTab
 from views.write_tab import WriteTab
 from views.read_tab import ReadTab
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LicenseView — outer container with inner tab widget
-# ══════════════════════════════════════════════════════════════════════════════
+
 class CardView(QWidget):
     """
-        Top-level view composed of three tabs:
-          ⚙ Provision  — create DESFire application + files
-          ✎ Write      — write license data to card
-          ⟳ Read       — read and verify card contents
-        """
+    Top-level view composed of three tabs:
+      ⚙ Provision  — create DESFire application + files
+      ✎ Write      — write license data to card
+      ⟳ Read       — read and verify card contents
+    """
     def __init__(self, vm: CardViewModel, db_view, parent=None):
         super().__init__(parent)
-        self.vm = vm
-        self.db_view = db_view
-        self._build_ui()
+        self.vm = vm                                      # ← was missing
 
-    def _build_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        tabs = QTabWidget()
-        tabs.addTab(ProvisionTab(vm=self.vm, db_view=self.db_view), "⚙ Provision")
-        tabs.addTab(WriteTab(vm=self.vm), "✎ Write")
-        tabs.addTab(ReadTab(vm=self.vm), "⟳ Read")
-        root.addWidget(tabs)
+        self.tabs = QTabWidget()
+
+        self.provision_tab = ProvisionTab(vm, db_view)
+        self.write_tab     = WriteTab(vm)
+        self.read_tab      = ReadTab(vm)
+
+        self.tabs.addTab(self.provision_tab, "⚙  Provision")
+        self.tabs.addTab(self.write_tab,     "✎  Write")
+        self.tabs.addTab(self.read_tab,      "⟳  Read")
+
+        layout.addWidget(self.tabs)                       # ← was missing
+
+        # ── License type → File 3 size + label ───────────────────────────
+        self.write_tab.license_type_combo.currentIndexChanged.connect(
+            self.vm.set_license_type
+        )
+        self.write_tab.license_type_combo.currentIndexChanged.connect(
+            self.provision_tab.on_license_type_changed
+        )
+
+        # Set initial state from WriteTab's default (index 0 = Perpetual)
+        initial_idx = self.write_tab.license_type_combo.currentIndex()
+        self.vm.set_license_type(initial_idx)
+        self.provision_tab.on_license_type_changed(initial_idx)
+

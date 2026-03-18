@@ -203,49 +203,79 @@ class CardService:
 
     def get_file_settings(self, file_id: int) -> dict:
         """
-        GetFileSettings (0xF5) response for Standard Data File (type 0x00):
-          Byte 0    : File type (0x00 = Standard)
-          Byte 1    : Comm mode (0x00=Plain, 0x01=MACed, 0x03=Encrypted)
-          Bytes 2-3 : Access rights LE (16-bit)
-          Bytes 4-6 : File size (24-bit LE)
+        Read and decode DESFire file settings for a standard data file.
+
+        Returns:
+            {
+                "file_id": int,
+                "type": str,
+                "comm_mode": str,
+                "size": int,
+                "read": str,
+                "write": str,
+                "rw": str,
+                "change": str,
+                "read_nibble": int,
+                "write_nibble": int,
+                "rw_nibble": int,
+                "change_nibble": int,
+            }
         """
         resp, sw1, sw2 = self._transmit(_apdu(INS_GET_FILE_SETTINGS, bytes([file_id])))
-        if not (sw1 == 0x91 and sw2 == 0x00):
+        if not _ok(sw1, sw2):
             raise CardServiceError(
-                f"GetFileSettings file {file_id:02X} failed: {sw1:02X} {sw2:02X}"
+                f"GetFileSettings failed for file {file_id:02X}: {sw1:02X} {sw2:02X}"
             )
-        data = bytes(resp)
 
-        file_type = data[0]
-        comm_mode = data[1] & 0x03  # bits 1-0 only
-        ar_word = struct.unpack("<H", data[2:4])[0]  # 16-bit LE
-        size = struct.unpack("<I", data[4:7] + b"\x00")[0]  # 24-bit LE
+        if len(resp) < 7:
+            raise CardServiceError(
+                f"GetFileSettings returned too few bytes for file {file_id:02X}: {resp}"
+            )
 
-        # Decode access rights nibbles
-        read_key = (ar_word >> 12) & 0xF
-        write_key = (ar_word >> 8) & 0xF
-        rw_key = (ar_word >> 4) & 0xF
-        chg_key = ar_word & 0xF
+        file_type = resp[0]
+        comm_mode = resp[1]
+        access = (resp[3] << 8) | resp[2]
+        size = resp[4] | (resp[5] << 8) | (resp[6] << 16)
 
-        comm_labels = {0x00: "Plain", 0x01: "MACed", 0x03: "Encrypted"}
-        type_labels = {0x00: "Standard", 0x01: "Backup",
-                       0x02: "Value", 0x03: "LinearRecord", 0x04: "CyclicRecord"}
+        read_nibble = (access >> 12) & 0x0F
+        write_nibble = (access >> 8) & 0x0F
+        rw_nibble = (access >> 4) & 0x0F
+        change_nibble = access & 0x0F
 
-        def nibble_str(n):
-            if n == 0xE: return "Free"
-            if n == 0xF: return "None"
-            return f"Key{n + 1}"
+        def fmt_access(n: int) -> str:
+            if n == 0xE:
+                return "Free"
+            if n == 0xF:
+                return "None"
+            return f"Key {n}"
+
+        file_type_names = {
+            0x00: "Standard",
+            0x01: "Backup",
+            0x02: "Value",
+            0x03: "Linear Record",
+            0x04: "Cyclic Record",
+        }
+
+        comm_mode_names = {
+            0x00: "Plain",
+            0x01: "MACed",
+            0x03: "Encrypted",
+        }
 
         return {
             "file_id": file_id,
-            "type": type_labels.get(file_type, f"0x{file_type:02X}"),
-            "comm_mode": comm_labels.get(comm_mode, f"0x{comm_mode:02X}"),
-            "ar_raw": f"0x{ar_word:04X}",
-            "read": nibble_str(read_key),
-            "write": nibble_str(write_key),
-            "rw": nibble_str(rw_key),
-            "change": nibble_str(chg_key),
+            "type": file_type_names.get(file_type, f"Unknown (0x{file_type:02X})"),
+            "comm_mode": comm_mode_names.get(comm_mode, f"Unknown (0x{comm_mode:02X})"),
             "size": size,
+            "read": fmt_access(read_nibble),
+            "write": fmt_access(write_nibble),
+            "rw": fmt_access(rw_nibble),
+            "change": fmt_access(change_nibble),
+            "read_nibble": read_nibble,
+            "write_nibble": write_nibble,
+            "rw_nibble": rw_nibble,
+            "change_nibble": change_nibble,
         }
 
     # ── Authentication (Plain mode stub) ─────────────────────────────────────
@@ -395,54 +425,65 @@ class CardService:
             )
 
     # ── Application management ────────────────────────────────────────────────
-    def provision(self,
-                  app_id: bytes,
-                  key_settings: int,
-                  comm_mode: CommMode,
-                  access_rights: dict,
-                  log: Callable[[str], None] = print):
-        """
-        Full provision sequence with step-by-step logging.
-        access_rights: {file_id: (read_nibble, write_nibble)}
-        """
-        self._log("── Provision Start ──────────────────────────────")
-        # ── Step 1: Select PICC master app ───────────────────────
-        self._log("Step 1: SelectApplication(000000) — PICC master")
+    def provision(self, app_id: bytes, key_settings: int,
+                  comm_mode: CommMode, access_rights: dict,
+                  params_size: int = 12,  # ← new
+                  log=None) -> None:
+
+        def _log(msg):
+            if log:
+                log(msg)
+
+        # ── Select PICC ───────────────────────────────────────────
         self.select_app(bytes([0x00, 0x00, 0x00]))
-        self._log("        OK")
+        _log("PICC selected.")
 
-        # ── Step 2: Create application ───────────────────────────
-        aid_hex = app_id.hex().upper()
-        self._log(f"Step 2: CreateApplication(AID={aid_hex}, "
-            f"KeySettings=0x{key_settings:02X}, NumKeys=5)")
-        self.create_app(app_id, key_settings, num_keys=5)
-        log("        OK")
+        # ── CreateApplication ─────────────────────────────────────
+        aid_le = bytes(reversed(app_id))
+        num_keys = 0x06  # 6 keys
+        payload = aid_le + bytes([key_settings, num_keys])
+        resp, sw1, sw2 = self._transmit(_apdu(INS_CREATE_APP, payload))
+        if not _ok(sw1, sw2):
+            raise CardServiceError(f"CreateApplication failed: {sw1:02X} {sw2:02X}")
+        _log(f"Application {app_id.hex().upper()} created.")
 
-        # ── Step 3: Select new application ───────────────────────
-        self._log(f"Step 3: SelectApplication({aid_hex})")
+        # ── SelectApplication ─────────────────────────────────────
         self.select_app(app_id)
-        self._log("        OK")
+        _log(f"Application {app_id.hex().upper()} selected.")
 
-        # ── Step 4–7: Create files ───────────────────────────────
-        file_specs = [
-            (FILE_SERIAL, "Serial Number", 12),
-            (FILE_TYPE, "License Type", 1),
-            (FILE_PARAMS, "License Parameters", 12),
-            (FILE_CHECKSUM, "Checksum", 4),
-        ]
-        for file_id, name, size in file_specs:
-            read_n, write_n = access_rights[file_id]
-            ar = self._build_ar(read_n, write_n, 0xF, 0x0)
-            self._log(f"Step {file_id + 3}: CreateStdDataFile("
-                f"ID=0x{file_id:02X}, '{name}', "
-                f"Size={size}B, "
-                f"CommMode={comm_mode.name}, "
-                f"AR=0x{ar:04X} "
-                f"[R=0x{read_n:X} W=0x{write_n:X}])")
-            self._create_std_file(file_id, comm_mode, ar, size)
-            self._log(f"        OK")
+        # ── Helper ────────────────────────────────────────────────
+        def _access_word(read_n, write_n, rw_n=0xF, change_n=0x0) -> bytes:
+            word = (read_n << 12) | (write_n << 8) | (rw_n << 4) | change_n
+            return struct.pack("<H", word)
 
-        self._log("── Provision Complete ───────────────────────────")
+        def _create_std_file(file_id, size, read_n, write_n):
+            '''
+            if size == 0:
+                _log(f"File {file_id:02X} skipped (size=0).")
+                return
+            '''
+            comm = int(comm_mode)
+            access = _access_word(read_n, write_n)
+            payload = (
+                    bytes([file_id, comm]) +
+                    access +
+                    struct.pack("<I", size)[:3]
+            )
+            resp, sw1, sw2 = self._transmit(_apdu(INS_CREATE_STD_FILE, payload))
+            if not _ok(sw1, sw2):
+                raise CardServiceError(
+                    f"CreateStdDataFile {file_id:02X} failed: {sw1:02X} {sw2:02X}"
+                )
+            _log(f"File {file_id:02X} created — size={size}B, "
+                 f"read=0x{read_n:X}, write=0x{write_n:X}.")
+
+        r = access_rights
+
+        _create_std_file(FILE_SERIAL, 12, *r[FILE_SERIAL])
+        _create_std_file(FILE_TYPE, 1, *r[FILE_TYPE])
+        _create_std_file(FILE_PARAMS, params_size, *r[FILE_PARAMS])  # ← dynamic
+        _create_std_file(FILE_CHECKSUM, 4, *r[FILE_CHECKSUM])
+
     def select_app(self, app_id: bytes = APP_ID):
         resp, sw1, sw2 = self._transmit(_apdu(INS_SELECT_APP, app_id[::-1]))
         if not _ok(sw1, sw2):
@@ -476,6 +517,23 @@ class CardService:
                 (rw & 0xF) << 4 |
                 (change & 0xF)
         )
+
+    def _read_file(self, file_id: int, offset: int, length: int) -> bytes:
+        header = (
+                bytes([file_id]) +
+                struct.pack("<I", offset)[:3] +
+                struct.pack("<I", length)[:3]
+        )
+        resp, sw1, sw2 = self._transmit(_apdu(INS_READ_DATA, header))
+        if not _ok(sw1, sw2):
+            raise CardServiceError(
+                f"ReadData file {file_id:02X} failed: {sw1:02X} {sw2:02X}"
+            )
+        return bytes(resp)
+
+    def read_file_keyed(self, file_id: int, length: int, key_no=None, key=None) -> bytes:
+        self._auth_if_needed(key_no, key)
+        return self._read_file(file_id, 0, length)
 
     def _create_std_file(self, file_id: int, comm_mode: CommMode,
                          access_rights: int, size: int):
@@ -511,6 +569,7 @@ class CardService:
     def write_license_keyed(self, card: LicenseCard,
                             write_data_key, write_params_key, write_chksum_key,
                             key_no_data, key_no_params, key_no_chksum):
+
         serial_bytes = card.serial.encode()
         type_byte = bytes([int(card.license_type)])
         params_bytes = card.params.encode()

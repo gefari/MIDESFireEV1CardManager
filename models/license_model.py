@@ -36,6 +36,8 @@ KEY_TYPE_NAMES = {
 }
 
 
+
+
 # ── Communication modes ───────────────────────────────────────────────────────
 class CommMode(IntEnum):
     PLAIN     = 0x00
@@ -48,6 +50,12 @@ class LicenseType(IntEnum):
     TIME_LIMITED = 1
     PER_USE      = 2
 
+# File 3 sizes per license type
+FILE_PARAMS_SIZE = {
+    LicenseType.PERPETUAL:    1,   # 1 byte: 0x01=valid, 0x00=invalid
+    LicenseType.TIME_LIMITED: 12,  # YYMMDDHHMMSS ASCII, All zeros == License Not Valid
+    LicenseType.PER_USE:      4,   # uint16 num_uses, uint16 hours_per_use All zeros Not Valid
+}
 # ── Serial Number ─────────────────────────────────────────────────────────────
 @dataclass
 class SerialNumber:
@@ -70,6 +78,7 @@ class SerialNumber:
 @dataclass
 class LicenseParams:
     license_type: LicenseType = LicenseType.PERPETUAL
+    valid: bool = True  # Perpetual only: 0x01=valid, 0x00=invalid
 
     # Type 1
     expiration: Optional[datetime.datetime] = None
@@ -80,13 +89,11 @@ class LicenseParams:
 
     def encode(self) -> bytes:
         if self.license_type == LicenseType.PERPETUAL:
-            return b""
-        if self.license_type == LicenseType.TIME_LIMITED:
-            exp = self.expiration or datetime.datetime.utcnow()
-            return exp.strftime("%y%m%d%H%M%S").encode("ascii")   # 12 bytes
-        if self.license_type == LicenseType.PER_USE:
-            return struct.pack(">HH", self.num_uses, self.hours_per_use)  # 4 bytes
-        raise ValueError("Unknown license type")
+            return bytes([0x01 if self.valid else 0x00])
+        elif self.license_type == LicenseType.TIME_LIMITED:
+            return self.expiration.strftime("%y%m%d%H%M%S").encode("ascii")
+        else:  # PER_USE
+            return struct.pack(">HH", self.num_uses, self.hours_per_use)
 
     @classmethod
     def decode(cls, license_type: LicenseType, raw: bytes) -> "LicenseParams":

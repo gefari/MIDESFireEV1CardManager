@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QSplitter,
-                               QTextEdit, QLabel, QVBoxLayout, QWidget,
+                               QTextEdit, QLabel, QVBoxLayout, QHBoxLayout, QWidget,
                                QGroupBox, QGridLayout, QPushButton)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -45,23 +45,19 @@ class MainWindow(QMainWindow):
         nfc_layout.setContentsMargins(8, 12, 8, 8)
         nfc_layout.setSpacing(6)
 
-        # Reader selector
         self.btn_refresh_readers = QPushButton("🔄 NFC Reader Scan")
         nfc_layout.addWidget(self.btn_refresh_readers, 0, 1)
 
-        # Reader Description
         nfc_layout.addWidget(QLabel("Reader Description:"), 1, 0)
         self.lbl_reader_description = QLabel("No reader detected")
         self.lbl_reader_description.setStyleSheet("color: gray; font-style: italic;")
         nfc_layout.addWidget(self.lbl_reader_description, 1, 1, 1, 2)
 
-        # Card status
         nfc_layout.addWidget(QLabel("Card Status:"), 2, 0)
         self.lbl_card_status = QLabel("No card detected")
         self.lbl_card_status.setStyleSheet("color: gray; font-style: italic;")
         nfc_layout.addWidget(self.lbl_card_status, 2, 1, 1, 2)
 
-        # Card Type
         nfc_layout.addWidget(QLabel("Card Type:"), 3, 0)
         self.lbl_card_type = QLabel("Unknown card type")
         self.lbl_card_type.setFont(QFont("Courier New", 9))
@@ -74,9 +70,17 @@ class MainWindow(QMainWindow):
         log_layout = QVBoxLayout(log_widget)
         log_layout.setContentsMargins(8, 8, 8, 8)
 
+        # ── Log header row (label + clear button) ─────────────────────────
+        log_header_row = QHBoxLayout()
         log_header = QLabel("Application Log")
         log_header.setStyleSheet("font-weight: bold; padding-bottom: 4px;")
-        log_layout.addWidget(log_header)
+        self.btn_clear_log = QPushButton("🗑 Clear")
+        self.btn_clear_log.setFixedWidth(70)
+        self.btn_clear_log.setStyleSheet("font-size: 11px;")
+        log_header_row.addWidget(log_header)
+        log_header_row.addStretch()
+        log_header_row.addWidget(self.btn_clear_log)
+        log_layout.addLayout(log_header_row)
 
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
@@ -94,6 +98,7 @@ class MainWindow(QMainWindow):
 
         # ── NFC signal wiring ─────────────────────────────────────────────
         self.btn_refresh_readers.clicked.connect(self._find_reader)
+        self.btn_clear_log.clicked.connect(self.log_text.clear)
         self.vm.cardInserted.connect(self._on_card_inserted)
         self.vm.cardRemoved.connect(self._on_card_removed)
         self.vm.readerFound.connect(self._on_reader_found)
@@ -114,7 +119,7 @@ class MainWindow(QMainWindow):
         self.vm.find_reader()
 
     def _disconnect_reader(self):
-        self.vm.disconnect_reader()              # expected VM method
+        self.vm.disconnect_reader()
         self.lbl_card_status.setText("No card detected")
         self.lbl_card_status.setStyleSheet("color: gray; font-style: italic;")
 
@@ -126,7 +131,7 @@ class MainWindow(QMainWindow):
             self.lbl_card_type.setText("DESFire EV1 card detected")
             self.vm.connect_reader()
         else:
-            self.lbl_card_type.setText(f"⚠ Unknown card type")
+            self.lbl_card_type.setText("⚠ Unknown card type")
 
     def _on_card_removed(self):
         self.lbl_card_status.setText("⚠️ Card removed")
