@@ -1,33 +1,16 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QComboBox, QPushButton,
-    QGroupBox, QSpinBox, QDateTimeEdit, QMessageBox,
-    QTabWidget, QTextEdit
+    QWidget, QVBoxLayout, QTabWidget
 )
-from PySide6.QtCore import Qt, QDateTime, Slot
-from PySide6.QtGui import QFont
-from models.license_model import (
-    LicenseCard, LicenseType, LicenseParams, SerialNumber,
-    CommMode
-)
+
 from viewmodels.card_viewmodel import CardViewModel
 from views.provision_tab import ProvisionTab
 from views.write_tab import WriteTab
 from views.read_tab import ReadTab
-import datetime
-
-'''
-# ── Shared helpers ─────────────────────────────────────────────────────────────
-def mono_font() -> QFont:
-    f = QFont("Courier New", 10)
-    f.setFixedPitch(True)
-    return f
-'''
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LicenseView — outer container with inner tab widget
 # ══════════════════════════════════════════════════════════════════════════════
-class LicenseView(QWidget):
+class CardView(QWidget):
     """
         Top-level view composed of three tabs:
           ⚙ Provision  — create DESFire application + files

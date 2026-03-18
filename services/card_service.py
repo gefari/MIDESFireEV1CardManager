@@ -159,38 +159,8 @@ class CardService:
             self._conn = None
 
     def _transmit(self, apdu: List[int]):
-        '''
-        INS_NAMES = {
-            0x5A: "SELECT_APPLICATION",
-            0x6A: "GET_APPLICATION_IDS",
-            0x6F: "GET_FILE_IDS",
-            0xF5: "GET_FILE_SETTINGS",
-            # ...add others as needed
-        }
-
-        def _decode_get_file_settings(resp: bytes) -> str:
-            if len(resp) < 7:
-                return "invalid length"
-            file_type = resp[0]
-            comm_mode = resp[1] & 0x03
-            ar_word = struct.unpack("<H", resp[2:4])[0]
-            size = struct.unpack("<I", resp[4:7] + b"\x00")[0]
-            read = (ar_word >> 12) & 0xF
-            write = (ar_word >> 8) & 0xF
-            rw = (ar_word >> 4) & 0xF
-            chg = ar_word & 0xF
-            return (f"type={file_type:02X} comm={comm_mode:02X} "
-                    f"AR=0x{ar_word:04X} "
-                    f"R={read:X} W={write:X} RW={rw:X} CHG={chg:X} size={size}")
-        '''
         if self._conn is None:
             raise CardServiceError("Not connected to reader.")
-        '''
-        cla, ins = apdu[0], apdu[1]
-        name = INS_NAMES.get(ins, f"INS_{ins:02X}")
-        apdu_hex = " ".join(f"{b:02X}" for b in apdu)
-        self._log(f">> {name}: {apdu_hex}")
-        '''
 
         # Green: PC → Reader → Card
         apdu_hex = " ".join(f"{b:02X}" for b in apdu)

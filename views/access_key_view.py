@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QGroupBox, QMessageBox, QComboBox, QFrame
 )
 from PySide6.QtCore import Slot
-from PySide6.QtGui import QClipboard, QGuiApplication
+from PySide6.QtGui import QGuiApplication
 from viewmodels.card_viewmodel import CardViewModel
 from views.card_database_view import CardDatabaseView
 from models.license_model import KeyType, KEY_TYPE_NAMES

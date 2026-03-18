@@ -1,4 +1,3 @@
-
 import csv
 import os
 from datetime import datetime
@@ -8,7 +7,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QFileDialog, QMessageBox, QLineEdit, QAbstractItemView,
 )
-from PySide6.QtCore import Slot, Qt
+from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont, QColor
 from viewmodels.card_viewmodel import CardViewModel
 

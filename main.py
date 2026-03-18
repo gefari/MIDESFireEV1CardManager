@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from viewmodels.card_viewmodel import CardViewModel
 from views.access_key_view import AccessKeyView
-from views.card_view import LicenseView
-from views.maintenance_view import LicenseTestView
+from views.card_view import CardView
+from views.card_maintenance_view import CardMaintenanceView
 from views.card_database_view import CardDatabaseView
 
 
@@ -22,10 +22,11 @@ class MainWindow(QMainWindow):
 
         # ── Tabs ─────────────────────────────────────────────────────────
         tabs = QTabWidget()
-        tabs.addTab(AccessKeyView(self.vm, self.db_tab), "Card Access Keys")
-        tabs.addTab(LicenseView(self.vm, self.db_tab),  "Card Manager")
-        tabs.addTab(LicenseTestView(self.vm),           "Card Maintenance")
-        tabs.addTab(self.db_tab,                        "Card Database")
+        tabs.addTab(CardView(self.vm, self.db_tab), "Card Manager")
+        tabs.addTab(CardMaintenanceView(self.vm), "Card Maintenance")
+        tabs.addTab(self.db_tab, "Card Database")
+        tabs.addTab(AccessKeyView(self.vm, self.db_tab), "Card Access Keys Generation")
+
         tabs.setMinimumWidth(800)
         splitter.addWidget(tabs)
 

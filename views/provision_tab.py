@@ -1,4 +1,3 @@
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QGroupBox,
@@ -239,27 +238,6 @@ class ProvisionTab(QWidget):
         f4_form.addRow("Write key:", self._make_key_combo(FILE_CHECKSUM, "write", default=2))
         root.addWidget(f4_box)
 
-
-        '''
-        # ── Files 1-2 row ─────────────────────────────────────────────────────
-        files12_box = QGroupBox("License Serial & Type (Files 1–2)")
-        files12_layout = QHBoxLayout(files12_box)
-        files12_layout.addWidget(self._make_key_combo(FILE_SERIAL, "read", default=2))
-        files12_layout.addWidget(self._make_key_combo(FILE_SERIAL, "write", default=4))
-        files12_layout.addWidget(self._make_key_combo(FILE_TYPE, "read", default=2))
-        files12_layout.addWidget(self._make_key_combo(FILE_TYPE, "write", default=4))
-        root.addWidget(files12_box)
-
-        # ── Files 3-4 row ─────────────────────────────────────────────────────
-        files34_box = QGroupBox("License Params & Checksum (Files 3–4)")
-        files34_layout = QHBoxLayout(files34_box)
-        files34_layout.addWidget(self._make_key_combo(FILE_PARAMS, "read", default=5))
-        files34_layout.addWidget(self._make_key_combo(FILE_PARAMS, "write", default=5))
-        files34_layout.addWidget(self._make_key_combo(FILE_CHECKSUM, "read", default=2))
-        files34_layout.addWidget(self._make_key_combo(FILE_CHECKSUM, "write", default=3))
-        root.addWidget(files34_box)
-        '''
-
         # ── Provision button + log ─────────────────────────────────────────
         self.btn_provision = QPushButton("⚙  Provision Card (Create App + Files)")
         self.btn_provision.setStyleSheet("font-weight: bold; padding: 6px;")
@@ -297,56 +275,42 @@ class ProvisionTab(QWidget):
 
     # ── Signals ───────────────────────────────────────────────────────────
     def _connect_signals(self):
-        # Reader
-        self.btn_connect.clicked.connect(self.vm.connect_reader)
-        self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
-        self.vm.readerFound.connect(self.reader_label.setText)
 
-        # Card presence
-        self.vm.cardInserted.connect(self._on_card_inserted)
-        self.vm.cardRemoved.connect(self._on_card_removed)
-
-        # UID
-        self.btn_uid.clicked.connect(self.vm.read_uid)
-        self.vm.uidRead.connect(self.uid_edit.setText)
-
-        # Applications
-        self.vm.appsRead.connect(self._populate_apps)
-
-        # Provision settings
-        self.app_key_settings_combo.currentIndexChanged.connect(
-            self._on_app_key_settings_changed)
-        self.app_key_settings_combo.currentIndexChanged.connect(
-            self.vm.set_app_key_settings_index)
+        # Action on combo index changed
         self.app_master_key_combo.currentIndexChanged.connect(
             self.vm.set_app_master_key)
+        self.app_key_settings_combo.currentIndexChanged.connect(
+            self._on_app_key_settings_changed)
         self.access_mode_combo.currentIndexChanged.connect(
             self._on_access_mode_changed)
-        self.vm.keyStoreChanged.connect(self._refresh_key_combos)
+        self.picc_key_type_combo.currentIndexChanged.connect(
+            self._on_picc_key_type_changed)
 
-        # Provision action
+        # Actions on button clicked in provision tab
+        self.btn_connect.clicked.connect(self.vm.connect_reader)
+        self.btn_disconnect.clicked.connect(self.vm.disconnect_reader)
+        self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_provision.clicked.connect(self._on_provision)
-        self.vm.provisionLog.connect(self.provision_log.append)
+        self.btn_auth_picc.clicked.connect(self._on_auth_picc)
+        self.btn_copy_picc_to_db.clicked.connect(self._on_copy_picc_to_db)
+        self.btn_fill_new_key.clicked.connect(self._on_fill_new_key)
+        self.btn_change_key.clicked.connect(self._on_change_key)
+        self.btn_clear_log.clicked.connect(self.provision_log.clear)
 
-        # Status / errors
+        # Connect provision to view model signal
+        self.vm.uidRead.connect(self.uid_edit.setText)
+        self.vm.keyStoreChanged.connect(self._refresh_key_combos)
+        self.vm.appsRead.connect(self._populate_apps)
+        self.vm.provisionLog.connect(self.provision_log.append)
+        self.vm.authResult.connect(self._on_auth_result)
+        self.vm.keyChanged.connect(self._on_key_changed)
+        self.vm.keyStoreChanged.connect(self._on_keys_changed)
         self.vm.statusChanged.connect(self.status_label.setText)
         self.vm.errorOccurred.connect(
             lambda m: QMessageBox.critical(self, "Error", m))
-
-        self.btn_auth_picc.clicked.connect(self._on_auth_picc)
-        self.vm.authResult.connect(self._on_auth_result)
-
-        self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
-
-        self.btn_copy_picc_to_db.clicked.connect(self._on_copy_picc_to_db)
-
-        self.btn_fill_new_key.clicked.connect(self._on_fill_new_key)
-        self.btn_change_key.clicked.connect(self._on_change_key)
-        self.vm.keyChanged.connect(self._on_key_changed)
-
-        self.vm.keyStoreChanged.connect(self._on_keys_changed)
-
-        self.btn_clear_log.clicked.connect(self.provision_log.clear)
+        self.vm.readerFound.connect(self.reader_label.setText)
+        self.vm.cardInserted.connect(self._on_card_inserted)
+        self.vm.cardRemoved.connect(self._on_card_removed)
 
     # ── Card presence ─────────────────────────────────────────────────────
     @Slot(str)

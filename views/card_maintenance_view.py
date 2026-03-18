@@ -12,7 +12,7 @@ def mono_font() -> QFont:
     f.setFixedPitch(True)
     return f
 
-class LicenseTestView(QWidget):
+class CardMaintenanceView(QWidget):
     def __init__(self, viewmodel: CardViewModel, parent=None):
         super().__init__(parent)
         self.vm = viewmodel

@@ -1,5 +1,3 @@
-# views/write_tab.py
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QPushButton,
