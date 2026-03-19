@@ -3,7 +3,9 @@ from PySide6.QtCore import QObject, Signal, Slot
 from models.license_model import (
     LicenseCard, CommMode, KeyStore, KEY_FREE,
     FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
-    LicenseType, FILE_PARAMS_SIZE,                        # ← add these two
+    LicenseType, FILE_PARAMS_SIZE,
+    SerialNumber,   # ← add this
+    LicenseParams
 )
 from services.card_service import CardService, CardServiceError
 from smartcard.System import readers as list_readers
@@ -308,10 +310,173 @@ class CardViewModel(QObject):
         except Exception:
             return f"{hex_dash(raw)}"
 
+    # ── Read Application via AID (with file values) ──────────────────────────────
+    @Slot()
+    def read_card(self, app_id_hex: str = None, read_keys: dict = None):
+        """
+        read_keys: optional dict mapping file_id -> hex key string.
+                   If None, falls back to self._key_store (existing behaviour).
+        """
+        self.statusChanged.emit(f"Reading Card..., AID: {app_id_hex.upper()}")
+        try:
+            aid_bytes = bytes.fromhex(app_id_hex or self._app_id)
+            self._service.select_app(aid_bytes)
+
+            def _resolve_key(fid: int, nibble: int) -> tuple[int | None, bytes | None]:
+                """Returns (key_no, key_bytes) honouring UI overrides."""
+                if nibble == 0xF:
+                    return None, None  # KEY_NONE — handled upstream
+                if nibble == 0xE:
+                    return None, None  # KEY_FREE — no auth needed
+
+                # UI override takes priority
+                if read_keys and fid in read_keys:
+                    raw = read_keys[fid].replace(" ", "")
+                    if raw:
+                        return nibble, bytes.fromhex(raw)
+
+                # Fall back to KeyStore
+                return nibble, self._key_store.get(nibble).key_bytes
+
+            def _read_file(fid: int) -> bytes:
+                settings = self._service.get_file_settings(fid)
+                read_nibble = int(settings.get("read_nibble", 0xE))
+                size = settings["size"]
+
+                if read_nibble == 0xF:
+                    raise CardServiceError(f"File {fid}: no read access (KEY_NONE)")
+
+                key_no, key_bytes = _resolve_key(fid, read_nibble)
+                return self._service.read_file_keyed(
+                    file_id=fid,
+                    length=size,
+                    key_no=key_no,
+                    key=key_bytes,
+                )
+
+            # ── File 1 – Serial ───────────────────────────────────────
+            raw_serial = _read_file(FILE_SERIAL)
+            serial = SerialNumber.decode(raw_serial)
+
+            # ── File 2 – License Type ─────────────────────────────────
+            raw_type = _read_file(FILE_TYPE)
+            license_type = LicenseType(raw_type[0])
+
+            # ── File 3 – Parameters ───────────────────────────────────
+            raw_params = _read_file(FILE_PARAMS)
+            params = LicenseParams.decode(license_type, raw_params)
+
+            # ── File 4 – Checksum ─────────────────────────────────────
+            raw_chksum = _read_file(FILE_CHECKSUM)
+            #checksum = struct.unpack_from("<I", raw_chksum)[0]
+            checksum = struct.unpack_from(">I", raw_chksum)[0]
+
+            card = LicenseCard(
+                serial=serial,
+                license_type=license_type,
+                params=params,
+                checksum=checksum,
+            )
+            self._card = card
+            self.cardRead.emit(card)
+            self.statusChanged.emit(
+                f"✅ Card read — Serial: {serial}, "
+                f"Type: {license_type.name}, "
+                f"Params: {params.valid}, "
+                f"CRC: {'OK' if card.checksum_valid() else 'INVALID'}"
+            )
+
+        except (CardServiceError, ValueError, IndexError) as e:
+            self.errorOccurred.emit(str(e))
+
+    '''
+    @Slot()
+    def read_card(self, app_id_hex: str = None):
+        msg = f"Reading Card..., AID: {app_id_hex.upper()}"
+        print(msg)
+        try:
+            aid_bytes = bytes.fromhex(app_id_hex)
+            file_ids = self._service.get_file_ids(aid_bytes)
+            serial = None
+            license_type = None
+            params = None
+
+            for fid in file_ids:
+                try:
+                    settings = self._service.get_file_settings(fid)
+                    decoded_value = ""
+
+                    try:
+                        read_nibble = settings.get("read_nibble", 0xE)  # raw nibble from card
+                        if int(read_nibble) == 0xF:
+                            # KEY_NONE — nobody can read this file
+                            decoded_value = "<no read access>"
+                            print(f"{fid}: {decoded_value}")
+                        elif int(read_nibble) == 0xE:
+                            # KEY_FREE — free access, no auth needed
+                            raw_value = self._service.read_file_keyed(
+                                file_id=fid,
+                                length=settings["size"],
+                                key_no=None,
+                                key=None,
+                            )
+                            if fid == 1:
+                                serial = int.from_bytes(raw_value, "little")
+                            elif fid == 2:
+                                license_type = LicenseType(raw_value[0])
+                            elif fid == 3:
+                                params = LicenseCard.decode_params(license_type, raw_value)
+                            elif fid == 4:
+                                chksum = struct.unpack_from("<I", raw_value)[0]
+                                card = LicenseCard(
+                                    serial=serial,
+                                    license_type=license_type,
+                                    params=params,
+                                    checksum=chksum,
+                                )
+                                self._card = card
+                                self.cardRead.emit(card)
+                                self.statusChanged.emit(
+                                    f"✅ Card read — Serial: {serial}, "
+                                    f"Type: {license_type.name}, "
+                                    f"CRC: {'OK' if card.checksum_valid() else 'INVALID'}"
+                                )
+                            else:
+                                self.errorOccurred.emit(str(""))
+
+                            print(f"KEY_FREE: {fid}: {raw_value}")
+                        else:
+                            # Key-protected — authenticate with the key from KeyStore
+                            key_no = int(read_nibble)
+                            try:
+                                read_key = self._key_store.get(key_no).key_bytes
+                                raw_value = self._service.read_file_keyed(
+                                    file_id=fid,
+                                    length=settings["size"],
+                                    key_no=key_no,
+                                    key=read_key,
+                                )
+                                print(f"{fid}: {raw_value}")
+                            except IndexError:
+                                decoded_value = f"<Key {key_no} not in KeyStore>"
+                            except CardServiceError as e:
+                                decoded_value = f"<auth failed Key {key_no}: {e}>"
+
+
+                    except CardServiceError as e:
+                        decoded_value = "<read failed>"
+                except CardServiceError as e:
+                    self.errorOccurred.emit(str(e))
+
+        except CardServiceError as e:
+            self.errorOccurred.emit(str(e))
+    '''
+
     # ── Read Applications (with file values) ──────────────────────────────
     @Slot()
     def read_applications(self):
         try:
+            # Retrieves all application present on the card
             aids = self._service.get_application_ids()
             result = []
             for entry in aids:

@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
-import struct, zlib, datetime
+import struct, zlib
 import secrets
 from enum import IntEnum
+
+from datetime import datetime
 
 # ── Application ──────────────────────────────────────────────────────────────
 APP_ID = bytes([0x01, 0x02, 0x03])          # 0x010203
@@ -60,7 +62,7 @@ FILE_PARAMS_SIZE = {
 @dataclass
 class SerialNumber:
     """Production timestamp encoded as YYMMDDHHMMSS (12 ASCII digits)."""
-    dt: datetime.datetime = field(default_factory=datetime.datetime.utcnow)
+    dt: datetime = field(default_factory=datetime.utcnow)
 
     def encode(self) -> bytes:
         return self.dt.strftime("%y%m%d%H%M%S").encode("ascii")   # 12 bytes
@@ -68,7 +70,7 @@ class SerialNumber:
     @classmethod
     def decode(cls, raw: bytes) -> "SerialNumber":
         s = raw.decode("ascii")
-        dt = datetime.datetime.strptime(s, "%y%m%d%H%M%S")
+        dt = datetime.strptime(s, "%y%m%d%H%M%S")
         return cls(dt=dt)
 
     def __str__(self):
@@ -81,7 +83,7 @@ class LicenseParams:
     valid: bool = True  # Perpetual only: 0x01=valid, 0x00=invalid
 
     # Type 1
-    expiration: Optional[datetime.datetime] = None
+    expiration: Optional[datetime] = None
 
     # Type 2
     num_uses: int = 0          # 0-65535
@@ -92,15 +94,17 @@ class LicenseParams:
             return bytes([0x01 if self.valid else 0x00])
         elif self.license_type == LicenseType.TIME_LIMITED:
             return self.expiration.strftime("%y%m%d%H%M%S").encode("ascii")
-        else:  # PER_USE
+        elif self.license_type == LicenseType.PER_USE:  # PER_USE
             return struct.pack(">HH", self.num_uses, self.hours_per_use)
+        else:
+            raise ValueError("Unknown license type")
 
     @classmethod
     def decode(cls, license_type: LicenseType, raw: bytes) -> "LicenseParams":
         if license_type == LicenseType.PERPETUAL:
             return cls(license_type=license_type)
         if license_type == LicenseType.TIME_LIMITED:
-            dt = datetime.datetime.strptime(raw.decode("ascii"), "%y%m%d%H%M%S")
+            dt = datetime.strptime(raw.decode("ascii"), "%y%m%d%H%M%S")
             return cls(license_type=license_type, expiration=dt)
         if license_type == LicenseType.PER_USE:
             n, h = struct.unpack(">HH", raw[:4])
@@ -121,10 +125,13 @@ class LicenseCard:
         payload  = self.serial.encode()
         payload += bytes([int(self.license_type)])
         payload += self.params.encode()
-        return zlib.crc32(payload) & 0xFFFF_FFFF
+        checksum = zlib.crc32(payload) & 0xFFFF_FFFF
+        return checksum
 
     def checksum_valid(self) -> bool:
-        return self.checksum == self.compute_checksum()
+        computed_checksum = self.compute_checksum()
+        return self.checksum == computed_checksum
+
 
 @dataclass
 class AccessKey:

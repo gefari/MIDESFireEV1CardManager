@@ -129,6 +129,7 @@ class CardMaintenanceView(QWidget):
     def _connect_signals(self):
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
+        # Read all apps
         self.btn_read_apps.clicked.connect(self._on_read_apps)
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
         self.vm.uidRead.connect(self.uid_edit.setText)
@@ -139,6 +140,7 @@ class CardMaintenanceView(QWidget):
         self.vm.logMessage.connect(self._log)
         self.vm.authResult.connect(self._on_auth_result)
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
+        #
         self.apps_tree.itemClicked.connect(self._on_tree_item_clicked)
 
     @Slot(QTreeWidgetItem, int)

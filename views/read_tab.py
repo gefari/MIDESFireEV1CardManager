@@ -6,7 +6,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont
 
-from models.license_model import LicenseCard, LicenseType
+from models.license_model import (
+    LicenseCard, LicenseType,
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
+)
 from viewmodels.card_viewmodel import CardViewModel
 
 
@@ -124,8 +127,15 @@ class ReadTab(QWidget):
                 f"Application ID must be exactly 6 hex chars.\nGot: '{app_id}'"
             )
             return
-        #self.vm.connect_reader()
-        self.vm.read_card(app_id)
+
+        keys = {
+            "app": self.app_read_key_edit.text().strip(),
+            FILE_SERIAL: self.serial_read_key_edit.text().strip(),
+            FILE_TYPE: self.lic_type_read_key_edit.text().strip(),
+            FILE_PARAMS: self.params_read_key_edit.text().strip(),
+            FILE_CHECKSUM: self.chksum_read_key_edit.text().strip(),
+        }
+        self.vm.read_card(app_id, keys)
 
     @Slot(LicenseCard)
     def _populate(self, card: LicenseCard):
