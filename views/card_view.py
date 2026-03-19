@@ -55,3 +55,33 @@ class CardView(QWidget):
         self.read_tab.app_id_edit.setText(aid)
         self.provision_tab.app_id_edit.setText(aid)
 
+    @Slot(str)
+    def set_file_id_read_access(self, fid: str, access: str):
+        """Sync file ID across Write and Provision tabs."""
+        #print(f"file id:{fid} -> read access: {access}")
+        if fid == 1:
+            self.read_tab.serial_read_key_edit.setText(access)
+        elif fid == 2:
+            self.read_tab.lic_type_read_key_edit.setText(access)
+        elif fid == 3:
+            self.read_tab.params_read_key_edit.setText(access)
+        elif fid == 4:
+            self.read_tab.chksum_read_key_edit.setText(access)
+        else:
+            print(f"Unknown Error!")
+
+    @Slot(str)
+    def set_file_id_write_access(self, fid: str, access: str):
+        """Sync file ID across Write and Provision tabs."""
+        # print(f"file id:{fid} -> read access: {access}")
+        if fid == 1:
+            self.write_tab.serial_write_key_edit.setText(access)
+        elif fid == 2:
+            self.write_tab.lic_type_write_key_edit.setText(access)
+        elif fid == 3:
+            self.write_tab.params_write_key_edit.setText(access)
+        elif fid == 4:
+            self.write_tab.chksum_write_key_edit.setText(access)
+        else:
+            print(f"Unknown Error!")
+

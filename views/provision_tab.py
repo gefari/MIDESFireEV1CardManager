@@ -159,7 +159,7 @@ class ProvisionTab(QWidget):
         # ══════════════════════════════════════════════════════════════════
         # SECTION 3 — Provision settings
         # ══════════════════════════════════════════════════════════════════
-        access_box = QGroupBox("Access Mode")
+        access_box = QGroupBox("Access Mode (who is allowed to do what at the application level)")
         access_form = QFormLayout(access_box)
 
         self.app_id_edit = QLineEdit("010203")

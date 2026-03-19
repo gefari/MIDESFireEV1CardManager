@@ -42,6 +42,9 @@ class MainWindow(QMainWindow):
             lambda _: self.tabs.setCurrentWidget(self.card_view)
         )
 
+        self.maintenance.fileReadKeySelected.connect(self.card_view.set_file_id_read_access)
+        self.maintenance.fileWriteKeySelected.connect(self.card_view.set_file_id_write_access)
+
         self.tabs.setMinimumWidth(800)
         splitter.addWidget(self.tabs)
 

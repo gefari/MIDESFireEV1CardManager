@@ -41,6 +41,10 @@ class ReadTab(QWidget):
         self.app_id_edit.setFont(mono_font())
         self.app_id_edit.setPlaceholderText("6 hex chars  e.g. 010203")
         app_form.addRow("Application ID (hex):", self.app_id_edit)
+
+        self.app_read_key_edit = QLineEdit()
+        app_form.addRow("Read key:", self.app_read_key_edit)
+
         root.addWidget(app_box)
 
         # ── File 1 – Serial ────────────────────────────────────────
@@ -50,6 +54,10 @@ class ReadTab(QWidget):
         self.serial_edit.setReadOnly(True)
         self.serial_edit.setFont(mono_font())
         f1_form.addRow("Serial:", self.serial_edit)
+
+        self.serial_read_key_edit = QLineEdit()
+        f1_form.addRow("Read key:", self.serial_read_key_edit)
+
         root.addWidget(f1_box)
 
         # ── File 2 – License Type ──────────────────────────────────
@@ -58,6 +66,10 @@ class ReadTab(QWidget):
         self.type_edit = QLineEdit()
         self.type_edit.setReadOnly(True)
         f2_form.addRow("Type:", self.type_edit)
+
+        self.lic_type_read_key_edit = QLineEdit()
+        f2_form.addRow("Read key:", self.lic_type_read_key_edit)
+
         root.addWidget(f2_box)
 
         # ── File 3 – Parameters ────────────────────────────────────
@@ -66,6 +78,10 @@ class ReadTab(QWidget):
         self.params_edit = QLineEdit()
         self.params_edit.setReadOnly(True)
         f3_form.addRow("Parameters:", self.params_edit)
+
+        self.params_read_key_edit = QLineEdit()
+        f3_form.addRow("Read key:", self.params_read_key_edit)
+
         root.addWidget(f3_box)
 
         # ── File 4 – Checksum ──────────────────────────────────────
@@ -77,6 +93,10 @@ class ReadTab(QWidget):
         self.checksum_valid_label = QLabel("")
         f4_form.addRow("CRC-32:",   self.checksum_edit)
         f4_form.addRow("Validity:", self.checksum_valid_label)
+
+        self.chksum_read_key_edit = QLineEdit()
+        f4_form.addRow("Read key:", self.chksum_read_key_edit)
+
         root.addWidget(f4_box)
 
         # ── Read button ────────────────────────────────────────────

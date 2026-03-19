@@ -75,23 +75,23 @@ def _ok(sw1: int, sw2: int) -> bool:
     return (sw1 == 0x91 and sw2 == 0x00)
 
 # ── DESFire instruction codes ─────────────────────────────────────────────────
-INS_GET_VERSION         = 0x60
+INS_AUTH_NATIVE         = 0x0A   # Native DES/3DES auth
+INS_WRITE_DATA          = 0x3D
+INS_GET_KEY_SETTINGS    = 0x45
 INS_GET_UID             = 0x51   # requires AuthFirst on EV1
 INS_SELECT_APP          = 0x5A
-INS_CREATE_APP          = 0xCA
-INS_AUTH_NATIVE         = 0x0A   # Native DES/3DES auth
-INS_CREATE_STD_FILE     = 0xCD
-INS_WRITE_DATA          = 0x3D
-INS_READ_DATA           = 0xBD
-INS_COMMIT              = 0xC7
-INS_GET_FILE_IDS        = 0x6F
-INS_ADDITIONAL_FRAME    = 0xAF
+INS_GET_VERSION         = 0x60
 INS_GET_APP_IDS         = 0x6A
 INS_GET_FILE_IDS        = 0x6F
+INS_ADDITIONAL_FRAME    = 0xAF
+INS_READ_DATA           = 0xBD
+INS_CHANGE_KEY          = 0xC4
+INS_COMMIT              = 0xC7
+INS_CREATE_APP          = 0xCA
+INS_CREATE_STD_FILE     = 0xCD
 INS_DELETE_APP          = 0xDA
 INS_GET_FILE_SETTINGS   = 0xF5
 INS_FORMAT_PICC         = 0xFC
-INS_CHANGE_KEY          = 0xC4
 
 READER_NAME_FRAGMENT    = "uTrust 3720"
 
@@ -176,6 +176,31 @@ class CardService:
         self._log(f'<span style="color:#FF8800">◄◄◄ {resp_hex}  [{sw_str}]</span>')
 
         return resp_bytes, sw1, sw2
+
+    def get_key_settings(self) -> dict:
+        """
+        Call after SelectApplication. No auth required if key settings byte
+        bit 2 (free directory) is set. Otherwise requires AMK authentication.
+        """
+        resp, sw1, sw2 = self._transmit(_apdu(INS_GET_KEY_SETTINGS))
+        if not _ok(sw1, sw2):
+            raise CardServiceError(f"GetKeySettings failed: {sw1:02X} {sw2:02X}")
+
+        key_settings = resp[0]
+        num_keys = resp[1] & 0x0F
+        key_type_bits = (resp[1] >> 6) & 0x03
+
+        key_type_names = {0b00: "DES/2K3DES", 0b01: "3K3DES", 0b10: "AES-128"}
+
+        return {
+            "key_settings": key_settings,
+            "num_keys": num_keys,
+            "key_type": key_type_names.get(key_type_bits, "Unknown"),
+            "amk_changeable": bool(key_settings & 0x08),
+            "free_dir_list": bool(key_settings & 0x04),
+            "free_create_delete": bool(key_settings & 0x02),
+            "config_changeable": bool(key_settings & 0x01),
+        }
 
     # ── UID ───────────────────────────────────────────────────────────────────
     def get_uid(self) -> str:

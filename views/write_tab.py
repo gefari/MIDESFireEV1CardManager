@@ -70,8 +70,9 @@ class WriteTab(QWidget):
         serial_row.addWidget(self.btn_now)
         sn_form.addRow("Serial (YYMMDDHHMMSS):", serial_row)
 
-        self.f1_write_key_combo = self._make_write_key_combo()
-        sn_form.addRow("Write key:", self.f1_write_key_combo)
+
+        self.serial_write_key_edit = QLineEdit()
+        sn_form.addRow("Write key:", self.serial_write_key_edit)
 
         root.addWidget(sn_box)
 
@@ -86,8 +87,8 @@ class WriteTab(QWidget):
         ])
         lt_form.addRow("Type:", self.license_type_combo)
 
-        self.f2_write_key_combo = self._make_write_key_combo()
-        lt_form.addRow("Write key:", self.f2_write_key_combo)
+        self.lic_type_write_key_edit = QLineEdit()
+        lt_form.addRow("Write key:", self.lic_type_write_key_edit)
 
         root.addWidget(lt_box)
 
@@ -122,8 +123,8 @@ class WriteTab(QWidget):
         p_form.addRow(self.num_uses_label, self.num_uses_spin)
         p_form.addRow(self.hours_label, self.hours_spin)
 
-        self.f3_write_key_combo = self._make_write_key_combo(default=5)
-        p_form.addRow("Write key:", self.f3_write_key_combo)
+        self.params_write_key_edit = QLineEdit()
+        p_form.addRow("Write key:", self.params_write_key_edit)
 
         root.addWidget(self.params_box)
 
@@ -135,8 +136,8 @@ class WriteTab(QWidget):
         self.checksum_edit.setFont(mono_font())
         chk_form.addRow("CRC-32:", self.checksum_edit)
 
-        self.f4_write_key_combo = self._make_write_key_combo(default=3)
-        chk_form.addRow("Write key:", self.f4_write_key_combo)
+        self.chksum_write_key_edit = QLineEdit()
+        chk_form.addRow("Write key:", self.chksum_write_key_edit)
 
         root.addWidget(chk_box)
 
@@ -244,6 +245,25 @@ class WriteTab(QWidget):
         card.checksum = card.compute_checksum()
         return card
 
+    # ── Key index parser ───────────────────────────────────────────────────────
+    def _key_index_from_edit(self, edit: QLineEdit) -> int:
+        """
+        Parse a key index from a read-only key label field.
+        Accepts:  'Key 2'  → 2
+                  'Free'   → 6  (free-access combo index)
+                  'None'   → 6  (treat as free)
+        Falls back to 0 on parse failure.
+        """
+        text = edit.text().strip()
+        if text.lower() in ("free", "none", "—", ""):
+            return 6  # free-access index in key_store.key_names()
+        if text.lower().startswith("key"):
+            try:
+                return int(text.split()[-1])
+            except ValueError:
+                pass
+        return 0
+
     # ── Write slot ─────────────────────────────────────────────────────────────
     @Slot()
     def _on_write(self):
@@ -256,21 +276,25 @@ class WriteTab(QWidget):
             return
 
         app_id = self.app_id_edit.text().strip()
-        if len(app_id) != 6:
+        try:
+            b = bytes.fromhex(app_id)
+            if len(b) != 3:
+                raise ValueError
+        except ValueError:
             QMessageBox.warning(
                 self, "Invalid App ID",
-                f"Application ID must be exactly 6 hex chars.\nGot: '{app_id}'"
+                "Application ID must be exactly 6 valid hex characters."
             )
             return
 
         # Push per-file write keys into the ViewModel before writing
-        self.vm.set_file_key(FILE_SERIAL, "write", self.f1_write_key_combo.currentIndex())
-        self.vm.set_file_key(FILE_TYPE, "write", self.f2_write_key_combo.currentIndex())
-        self.vm.set_file_key(FILE_PARAMS, "write", self.f3_write_key_combo.currentIndex())
-        self.vm.set_file_key(FILE_CHECKSUM, "write", self.f4_write_key_combo.currentIndex())
+        self.vm.set_file_key(FILE_SERIAL, "write", self._key_index_from_edit(self.serial_write_key_edit))
+        self.vm.set_file_key(FILE_TYPE, "write", self._key_index_from_edit(self.lic_type_write_key_edit))
+        self.vm.set_file_key(FILE_PARAMS, "write", self._key_index_from_edit(self.params_write_key_edit))
+        self.vm.set_file_key(FILE_CHECKSUM, "write", self._key_index_from_edit(self.chksum_write_key_edit))
 
         card = self._build_card_from_ui()
         self.vm.update_card(card)
-        self.vm.connect_reader()
+        #self.vm.connect_reader()
         self.vm.write_card(app_id)
 

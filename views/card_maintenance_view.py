@@ -17,6 +17,8 @@ def mono_font() -> QFont:
 class CardMaintenanceView(QWidget):
 
     aidSelected = Signal(str)  # emits the AID string e.g. "010203"
+    fileReadKeySelected = Signal(int, str)  # file_id, read-access
+    fileWriteKeySelected = Signal(int, str)  # file_id, write-access
 
     def __init__(self, viewmodel: CardViewModel, parent=None):
         super().__init__(parent)
@@ -141,12 +143,45 @@ class CardMaintenanceView(QWidget):
 
     @Slot(QTreeWidgetItem, int)
     def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
-        # Only emit for top-level AID rows (no parent)
-        if item.parent() is None:
+        parent = item.parent()
+
+        # ── Top-level AID row ─────────────────────────────────────────
+        if parent is None:
             aid = item.text(0).strip()
             if aid and aid != "No applications found":
                 self.aidSelected.emit(aid)
                 self._log(f"AID selected: {aid}")
+
+                # ── Scan all file children and emit read key for each ─
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    file_id_str = child.text(0).strip()  # e.g. "File 0x01"
+                    read_access = child.text(4).strip()  # column 4 = "Read"
+                    write_access = child.text(5).strip()  # column 5 = "Write"
+
+                    try:
+                        file_id = int(file_id_str.split("0x")[-1], 16)
+                    except ValueError:
+                        continue
+                    self.fileReadKeySelected.emit(file_id, read_access)
+                    self.fileWriteKeySelected.emit(file_id, write_access)
+
+                    self._log(f"  File 0x{file_id:02X} → Read: {read_access}")
+            return
+
+        # ── Child file row clicked directly ───────────────────────────
+        file_id_str = item.text(0).strip()
+        read_access = item.text(4).strip()
+        write_access = item.text(5).strip()
+
+        try:
+            file_id = int(file_id_str.split("0x")[-1], 16)
+        except ValueError:
+            return
+        self.fileReadKeySelected.emit(file_id, read_access)
+        self.fileWriteKeySelected.emit(file_id, write_access)
+        self._log(f"File 0x{file_id:02X} selected — Read: {read_access}")
+        self._log(f"File 0x{file_id:02X} selected — Read: {write_access}")
 
     @Slot()
     def _on_erase(self):
