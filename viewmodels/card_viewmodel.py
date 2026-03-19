@@ -154,11 +154,19 @@ class CardViewModel(QObject):
     def get_file_key(self, file_id: int, role: str) -> int:
         return self._file_key_map[file_id][role]
 
-    def _read_key(self, file_id: int, role: str):
-        idx = self._file_key_map[file_id][role]
-        if idx == 5:
-            return None
+    def _read_key(self, file_id: int, role: str) -> bytes | None:
+        idx    = self._file_key_map[file_id][role]
+        nibble = self._key_store.key_index_to_nibble(idx)
+        if nibble == KEY_FREE:
+            return None            # free access — no key bytes needed
         return self._key_store.get(idx).key_bytes
+
+    def _key_no(self, file_id: int, role: str) -> int | None:
+        idx = self._file_key_map[file_id][role]
+        nibble = self._key_store.key_index_to_nibble(idx)
+        if nibble == KEY_FREE:
+            return None  # free access — no key number needed
+        return idx
 
     def _nibble(self, file_id: int, role: str) -> int:
         idx = self._file_key_map[file_id][role]
@@ -235,46 +243,27 @@ class CardViewModel(QObject):
     @Slot(str)
     def write_card(self, app_id_hex: str = None):
         try:
-            # Use provided app_id or fall back to the provisioned one
             app_id = bytes.fromhex(app_id_hex or self._app_id)
             self._service.select_app(app_id)
             self._service.write_license_keyed(
                 self._card,
-                write_data_key=self._read_key(FILE_SERIAL, "write"),
+                write_serial_key=self._read_key(FILE_SERIAL, "write"),
+                write_type_key=self._read_key(FILE_TYPE, "write"),
                 write_params_key=self._read_key(FILE_PARAMS, "write"),
                 write_chksum_key=self._read_key(FILE_CHECKSUM, "write"),
-                key_no_data=self._file_key_map[FILE_SERIAL]["write"],
-                key_no_params=self._file_key_map[FILE_PARAMS]["write"],
-                key_no_chksum=self._file_key_map[FILE_CHECKSUM]["write"],
+                key_number_serial=self._key_no(FILE_SERIAL, "write"),
+                key_number_type=self._key_no(FILE_TYPE, "write"),
+                key_number_params=self._key_no(FILE_PARAMS, "write"),
+                key_number_chksum=self._key_no(FILE_CHECKSUM, "write"),
             )
             self.cardWritten.emit()
             self.statusChanged.emit(
-                f"Card written successfully to app {app_id.hex().upper()}."
+                f"✅ Card written to app {app_id.hex().upper()}."
             )
         except (CardServiceError, ValueError) as e:
             self.errorOccurred.emit(str(e))
 
     # ── Read ──────────────────────────────────────────────────────────────
-    @Slot()
-    def read_card(self):
-        try:
-            self._service.select_app()
-            card = self._service.read_license_keyed(
-                read_data_key   = self._read_key(FILE_SERIAL, "read"),
-                read_params_key = self._read_key(FILE_PARAMS, "read"),
-                key_no_data     = self._file_key_map[FILE_SERIAL]["read"],
-                key_no_params   = self._file_key_map[FILE_PARAMS]["read"],
-            )
-            self._card = card
-            self.cardRead.emit(card)
-            valid = card.checksum_valid()
-            self.statusChanged.emit(
-                f"Read OK | {card.serial} | "
-                f"{card.license_type.name} | "
-                f"Checksum: {'✔ Valid' if valid else '✘ INVALID'}"
-            )
-        except CardServiceError as e:
-            self.errorOccurred.emit(str(e))
 
     # ── Auth ──────────────────────────────────────────────────────────────
     @Slot(str)
@@ -300,34 +289,24 @@ class CardViewModel(QObject):
 
     # ── File value decoder ────────────────────────────────────────────────
     def _decode_file_value(self, file_id: int, raw: bytes) -> str:
+        def hex_dash(b: bytes) -> str:
+            return "-".join(f"{x:02X}" for x in b)
+
         try:
             if file_id == FILE_SERIAL:
-                decoded = raw.decode("ascii").strip("\x00")
-                return f"{decoded}  [{raw.hex().upper()}]"
+                return f"{hex_dash(raw)}"
 
             if file_id == FILE_TYPE:
-                t = raw[0]
-                name = {0: "PERPETUAL", 1: "TIME_LIMITED", 2: "PER_USE"}.get(t, f"Unknown ({t})")
-                return f"{name}  [{raw.hex().upper()}]"
+                return f"{hex_dash(raw)}"
 
             if file_id == FILE_PARAMS:
-                try:
-                    decoded = raw.decode("ascii").strip("\x00")
-                    return f"{decoded}  [{raw.hex().upper()}]"
-                except Exception:
-                    if len(raw) >= 4:
-                        n, h = struct.unpack(">HH", raw[:4])
-                        return f"Uses={n}, Hours/use={h}  [{raw.hex().upper()}]"
+                return f"{hex_dash(raw)}"
 
             if file_id == FILE_CHECKSUM:
-                if len(raw) >= 4:
-                    val = struct.unpack(">I", raw[:4])[0]
-                    return f"{val:08X}  [{raw.hex().upper()}]"
-
-            return raw.hex().upper()
+                return f"{hex_dash(raw)}"
 
         except Exception:
-            return raw.hex().upper()
+            return f"{hex_dash(raw)}"
 
     # ── Read Applications (with file values) ──────────────────────────────
     @Slot()
@@ -337,11 +316,11 @@ class CardViewModel(QObject):
             result = []
             for entry in aids:
                 if isinstance(entry, dict):
-                    aid_bytes   = entry["aid_bytes"]
+                    aid_bytes = entry["aid_bytes"]
                     aid_display = entry["aid_display"]
                 else:
                     aid_display = entry
-                    aid_bytes   = bytes.fromhex(entry)[::-1]
+                    aid_bytes = bytes.fromhex(entry)[::-1]
 
                 file_details = []
                 try:
@@ -351,7 +330,7 @@ class CardViewModel(QObject):
                             settings = self._service.get_file_settings(fid)
 
                             decoded_value = ""
-                            raw_value     = b""
+                            raw_value = b""
                             try:
                                 read_nibble = settings.get("read_nibble", 0xE)  # raw nibble from card
                                 comm_mode = settings.get("comm_mode", "Plain")
@@ -387,50 +366,10 @@ class CardViewModel(QObject):
                                     except CardServiceError as e:
                                         decoded_value = f"<auth failed Key {key_no}: {e}>"
 
-
-                                '''
-                                if comm_mode != "Plain":
-                                    # MACed or Encrypted — skip, cannot read without session key
-                                    decoded_value = f"<{comm_mode.lower()} — auth required>"
-                                elif int(read_nibble) != 0xE:
-                                    # Key-protected read — skip for now
-                                    decoded_value = f"<protected — Key {read_nibble}>"
-                                else:
-                                    # Free access + Plain — read directly
-                                    raw_value = self._service.read_file_keyed(
-                                        file_id=fid,
-                                        length=settings["size"],
-                                        key_no=None,
-                                        key=None,
-                                    )
-                                    decoded_value = self._decode_file_value(fid, raw_value)
-                                '''
-                                '''
-                                if read_nibble == KEY_FREE:  # 0xE = free access
-                                    key_no = None
-                                    read_key = None
-                                else:
-                                    read_idx = self._file_key_map.get(fid, {}).get("read", None)
-                                    if read_idx is None:
-                                        key_no = None
-                                        read_key = None
-                                    else:
-                                        key_no = read_idx
-                                        read_key = self._key_store.get(read_idx).key_bytes
-
-                                raw_value     = self._service.read_file_keyed(
-                                    file_id=fid,
-                                    length=settings["size"],
-                                    key_no=key_no,
-                                    key=read_key,
-                                )
-                                decoded_value = self._decode_file_value(fid, raw_value)
-                                '''
-
                             except CardServiceError:
                                 decoded_value = "<read failed>"
 
-                            settings["value"]   = decoded_value
+                            settings["value"] = decoded_value
                             settings["raw_hex"] = raw_value.hex().upper()
                             file_details.append(settings)
 
@@ -441,7 +380,7 @@ class CardViewModel(QObject):
                     pass
 
                 result.append({
-                    "aid":   aid_display,
+                    "aid": aid_display,
                     "files": file_details,
                 })
 

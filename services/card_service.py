@@ -6,6 +6,7 @@ Plain communication mode only for now (session key derivation stub included).
 
 import struct
 import os
+import zlib
 
 from typing import Optional, List, Callable
 
@@ -104,7 +105,7 @@ class CardService:
         self._conn:    Optional[CardConnection] = None
         self._monitor: Optional[CardMonitor]    = None
         self._session_key:        Optional[bytes] = None
-        self._authenticated_key:  Optional[int]   = None
+        self._authenticated_key_no:  Optional[int]   = None
 
         self._log: Callable[[str], None] = lambda _: None  # no-op by default
 
@@ -128,7 +129,7 @@ class CardService:
             self._monitor = None
         # reset auth on stop
         self._session_key       = None
-        self._authenticated_key = None
+        self._authenticated_key_no = None
 
         # ── Reader discovery ──────────────────────────────────────────────────────
     def find_reader(self) -> str:
@@ -399,7 +400,7 @@ class CardService:
 
         # Legacy DES/2K3DES session key derivation
         self._session_key = rnd_a[:4] + rnd_b[:4] + rnd_a[4:8] + rnd_b[4:8]
-        self._authenticated_key = key_no
+        self._authenticated_key_no = key_no
         return self._session_key
 
     def change_key(self, key_no: int, old_key: bytes, new_key: bytes):
@@ -559,39 +560,57 @@ class CardService:
         if not _ok(sw1, sw2):
             raise CardServiceError(f"WriteData file {file_id:02X} failed: {sw1:02X} {sw2:02X}")
 
-
     def _auth_if_needed(self, key_no: int, key: bytes):
-        """Skip authentication when key is None (free access, nibble 0xE)."""
-        if key is None:
-            return  # free access — no auth required
-        self.authenticate_plain(key_no, key)
+        """Authenticate only if key_no differs from the currently active session key."""
+        if key_no is None or key is None:
+            return  # free access — no auth needed
+        if key_no == self._authenticated_key_no:
+            return  # already authenticated with this key in current session
+        self.authenticate_plain(key_no=key_no, key=key)
+        self._authenticated_key_no = key_no
 
     def write_license_keyed(self, card: LicenseCard,
-                            write_data_key, write_params_key, write_chksum_key,
-                            key_no_data, key_no_params, key_no_chksum):
+                            write_serial_key: bytes, key_number_serial: int,
+                            write_type_key: bytes, key_number_type: int,
+                            write_params_key: bytes, key_number_params: int,
+                            write_chksum_key: bytes, key_number_chksum: int) -> None:
 
-        serial_bytes = card.serial.encode()
-        type_byte = bytes([int(card.license_type)])
-        params_bytes = card.params.encode()
-        checksum_bytes = struct.pack(">I", card.compute_checksum())
+        def _auth(key_no, key):
+            """Authenticate only when key is not free access."""
+            if key_no is not None and key is not None:
+                self.authenticate_plain(key_no=key_no, key=key)
 
-        # Write Serial + Type (same write key)
-        self._auth_if_needed(key_no_data, write_data_key)
-        self._write_file(FILE_SERIAL, 0, serial_bytes)
-        self._write_file(FILE_TYPE, 0, type_byte)
+        def _write(file_id: int, data: bytes):
+            header = (
+                    bytes([file_id]) +
+                    struct.pack("<I", 0)[:3] +  # offset = 0
+                    struct.pack("<I", len(data))[:3]  # length
+            )
+            resp, sw1, sw2 = self._transmit(_apdu(INS_WRITE_DATA, header + data))
+            if not _ok(sw1, sw2):
+                raise CardServiceError(
+                    f"WriteData file {file_id:02X} failed: {sw1:02X} {sw2:02X}"
+                )
 
-        # Write Parameters
-        self._auth_if_needed(key_no_params, write_params_key)
-        self._write_file(FILE_PARAMS, 0, params_bytes)
+        # ── File 1 – Serial ───────────────────────────────────────
+        _auth(key_number_serial, write_serial_key)
+        _write(FILE_SERIAL, card.serial.encode())
 
-        # Write Checksum
-        self._auth_if_needed(key_no_chksum, write_chksum_key)
-        self._write_file(FILE_CHECKSUM, 0, checksum_bytes)
+        # ── File 2 – License Type ─────────────────────────────────
+        # Re-auth only if File 2 uses a different key than File 1
+        if key_number_chksum != key_number_serial:
+            _auth(key_number_type, write_type_key)
+        _write(FILE_TYPE, bytes([int(card.license_type)]))
 
-        resp, sw1, sw2 = self._transmit(_apdu(INS_COMMIT))
-        if not (sw1 == 0x91 and sw2 == 0x00):
-            raise CardServiceError(f"Commit failed: {sw1:02X} {sw2:02X}")
+        # ── File 3 – Parameters ───────────────────────────────────
+        if key_number_params != key_number_type:
+            _auth(key_number_params, write_params_key)
+        _write(FILE_PARAMS, card.params.encode())
 
+        # ── File 4 – Checksum ─────────────────────────────────────
+        if key_number_chksum != key_number_params:
+            _auth(key_number_chksum, write_chksum_key)
+        _write(FILE_CHECKSUM, struct.pack(">I", card.checksum))
 
     def get_application_ids(self) -> list:
         """

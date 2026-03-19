@@ -33,6 +33,16 @@ class ReadTab(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
+        # ── Application ────────────────────────────────────────────
+        app_box = QGroupBox("Application")
+        app_form = QFormLayout(app_box)
+        self.app_id_edit = QLineEdit("010203")
+        self.app_id_edit.setMaxLength(6)
+        self.app_id_edit.setFont(mono_font())
+        self.app_id_edit.setPlaceholderText("6 hex chars  e.g. 010203")
+        app_form.addRow("Application ID (hex):", self.app_id_edit)
+        root.addWidget(app_box)
+
         # ── File 1 – Serial ────────────────────────────────────────
         f1_box = QGroupBox("File 1 – License Serial Number")
         f1_form = QFormLayout(f1_box)
@@ -87,9 +97,15 @@ class ReadTab(QWidget):
 
     @Slot()
     def _on_read(self):
-        if not self.vm.is_connected:
-            self.vm.connect_reader()
-        self.vm.read_card()
+        app_id = self.app_id_edit.text().strip()
+        if len(app_id) != 6:
+            QMessageBox.warning(
+                self, "Invalid App ID",
+                f"Application ID must be exactly 6 hex chars.\nGot: '{app_id}'"
+            )
+            return
+        #self.vm.connect_reader()
+        self.vm.read_card(app_id)
 
     @Slot(LicenseCard)
     def _populate(self, card: LicenseCard):

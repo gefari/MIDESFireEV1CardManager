@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTabWidget
 )
+from PySide6.QtCore import Slot
 
 from viewmodels.card_viewmodel import CardViewModel
 from views.provision_tab import ProvisionTab
@@ -46,4 +47,11 @@ class CardView(QWidget):
         initial_idx = self.write_tab.license_type_combo.currentIndex()
         self.vm.set_license_type(initial_idx)
         self.provision_tab.on_license_type_changed(initial_idx)
+
+    @Slot(str)
+    def set_app_id(self, aid: str):
+        """Sync app ID across Write and Provision tabs."""
+        self.write_tab.app_id_edit.setText(aid)
+        self.read_tab.app_id_edit.setText(aid)
+        self.provision_tab.app_id_edit.setText(aid)
 

@@ -24,14 +24,26 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # ── Tabs ─────────────────────────────────────────────────────────
-        tabs = QTabWidget()
-        tabs.addTab(CardView(self.vm, self.db_tab), "Card Manager")
-        tabs.addTab(CardMaintenanceView(self.vm), "Card Maintenance")
-        tabs.addTab(self.db_tab, "Card Database")
-        tabs.addTab(AccessKeyView(self.vm, self.db_tab), "Card Access Keys Generation")
+        #tabs = QTabWidget()
+        self.tabs = QTabWidget()
 
-        tabs.setMinimumWidth(800)
-        splitter.addWidget(tabs)
+        self.card_view = CardView(self.vm, self.db_tab)  # tab 0
+        self.maintenance = CardMaintenanceView(self.vm)  # tab 1
+
+        self.tabs.addTab(self.card_view, "Card Manager")
+        self.tabs.addTab(self.maintenance, "Card Maintenance")
+        self.tabs.addTab(self.db_tab, "Card Database")
+        self.tabs.addTab(AccessKeyView(self.vm, self.db_tab), "Card Access Keys Generation")
+
+        # ── AID selected in Maintenance → sync Write + Provision tabs ────
+        self.maintenance.aidSelected.connect(self.card_view.set_app_id)
+
+        self.maintenance.aidSelected.connect(
+            lambda _: self.tabs.setCurrentWidget(self.card_view)
+        )
+
+        self.tabs.setMinimumWidth(800)
+        splitter.addWidget(self.tabs)
 
         # ── Right panel (NFC Reader + Log) ────────────────────────────────
         right_widget = QWidget()

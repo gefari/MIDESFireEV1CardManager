@@ -8,7 +8,9 @@ from PySide6.QtGui import QFont
 
 from models.license_model import (
     LicenseCard, LicenseType, LicenseParams, SerialNumber, CommMode,
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
 )
+
 from viewmodels.card_viewmodel import CardViewModel
 
 import datetime
@@ -21,9 +23,6 @@ def mono_font() -> QFont:
     return f
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Write
-# ══════════════════════════════════════════════════════════════════════════════
 class WriteTab(QWidget):
     """Builds a LicenseCard from UI inputs and writes it to the card."""
 
@@ -70,6 +69,10 @@ class WriteTab(QWidget):
         serial_row.addWidget(self.serial_edit)
         serial_row.addWidget(self.btn_now)
         sn_form.addRow("Serial (YYMMDDHHMMSS):", serial_row)
+
+        self.f1_write_key_combo = self._make_write_key_combo()
+        sn_form.addRow("Write key:", self.f1_write_key_combo)
+
         root.addWidget(sn_box)
 
         # ── File 2 – License Type ──────────────────────────────────
@@ -82,6 +85,10 @@ class WriteTab(QWidget):
             "2 – Per Use",
         ])
         lt_form.addRow("Type:", self.license_type_combo)
+
+        self.f2_write_key_combo = self._make_write_key_combo()
+        lt_form.addRow("Write key:", self.f2_write_key_combo)
+
         root.addWidget(lt_box)
 
         # ── File 3 – Parameters ────────────────────────────────────
@@ -114,6 +121,10 @@ class WriteTab(QWidget):
         p_form.addRow(self.exp_label, self.exp_date_edit)
         p_form.addRow(self.num_uses_label, self.num_uses_spin)
         p_form.addRow(self.hours_label, self.hours_spin)
+
+        self.f3_write_key_combo = self._make_write_key_combo(default=5)
+        p_form.addRow("Write key:", self.f3_write_key_combo)
+
         root.addWidget(self.params_box)
 
         # ── File 4 – Checksum ──────────────────────────────────────
@@ -123,6 +134,10 @@ class WriteTab(QWidget):
         self.checksum_edit.setReadOnly(True)
         self.checksum_edit.setFont(mono_font())
         chk_form.addRow("CRC-32:", self.checksum_edit)
+
+        self.f4_write_key_combo = self._make_write_key_combo(default=3)
+        chk_form.addRow("Write key:", self.f4_write_key_combo)
+
         root.addWidget(chk_box)
 
         # ── Write button ───────────────────────────────────────────
@@ -134,23 +149,27 @@ class WriteTab(QWidget):
         root.addWidget(self.status_label)
         root.addStretch()
 
+    # ── Key combo helper ───────────────────────────────────────────────────────
+    def _make_write_key_combo(self, default: int = 4) -> QComboBox:
+        combo = QComboBox()
+        combo.addItems(self.vm.key_store.key_names())
+        combo.setCurrentIndex(default)
+        return combo
+
     # ── Signal wiring ──────────────────────────────────────────────────────────
-
     def _connect_signals(self):
-        # btn_now: stamp then recompute checksum — single connection each
         self.btn_now.clicked.connect(self._on_stamp_now)
+        self.btn_write.clicked.connect(self._on_write)
 
-        self.serial_edit.textChanged.connect(self._update_checksum)    # ← manual edits also trigger
-        self.license_type_combo.currentIndexChanged.connect(self._refresh_param_visibility)
-        self.license_type_combo.currentIndexChanged.connect(self._update_checksum)
+        self.serial_edit.textChanged.connect(self._update_checksum)
+        self.valid_combo.currentIndexChanged.connect(self._update_checksum)
         self.exp_date_edit.dateTimeChanged.connect(self._update_checksum)
         self.num_uses_spin.valueChanged.connect(self._update_checksum)
         self.hours_spin.valueChanged.connect(self._update_checksum)
 
-        self.btn_write.clicked.connect(self._on_write)
-        self.valid_combo.currentIndexChanged.connect(self._update_checksum)
+        self.license_type_combo.currentIndexChanged.connect(self._refresh_param_visibility)
+        self.license_type_combo.currentIndexChanged.connect(self._update_checksum)
 
-        # ViewModel signals
         self.vm.statusChanged.connect(self.status_label.setText)
         self.vm.errorOccurred.connect(
             lambda m: QMessageBox.critical(self, "Error", m)
@@ -225,6 +244,7 @@ class WriteTab(QWidget):
         card.checksum = card.compute_checksum()
         return card
 
+    # ── Write slot ─────────────────────────────────────────────────────────────
     @Slot()
     def _on_write(self):
         raw_serial = self.serial_edit.text().strip()
@@ -242,6 +262,12 @@ class WriteTab(QWidget):
                 f"Application ID must be exactly 6 hex chars.\nGot: '{app_id}'"
             )
             return
+
+        # Push per-file write keys into the ViewModel before writing
+        self.vm.set_file_key(FILE_SERIAL, "write", self.f1_write_key_combo.currentIndex())
+        self.vm.set_file_key(FILE_TYPE, "write", self.f2_write_key_combo.currentIndex())
+        self.vm.set_file_key(FILE_PARAMS, "write", self.f3_write_key_combo.currentIndex())
+        self.vm.set_file_key(FILE_CHECKSUM, "write", self.f4_write_key_combo.currentIndex())
 
         card = self._build_card_from_ui()
         self.vm.update_card(card)

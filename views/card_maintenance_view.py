@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Slot
 from viewmodels.card_viewmodel import CardViewModel
 from PySide6.QtGui import QFont, QColor
-
+from PySide6.QtCore import Signal
 
 def mono_font() -> QFont:
     f = QFont("Courier New", 10)
@@ -15,6 +15,9 @@ def mono_font() -> QFont:
 
 
 class CardMaintenanceView(QWidget):
+
+    aidSelected = Signal(str)  # emits the AID string e.g. "010203"
+
     def __init__(self, viewmodel: CardViewModel, parent=None):
         super().__init__(parent)
         self.vm = viewmodel
@@ -134,6 +137,16 @@ class CardMaintenanceView(QWidget):
         self.vm.logMessage.connect(self._log)
         self.vm.authResult.connect(self._on_auth_result)
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
+        self.apps_tree.itemClicked.connect(self._on_tree_item_clicked)
+
+    @Slot(QTreeWidgetItem, int)
+    def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
+        # Only emit for top-level AID rows (no parent)
+        if item.parent() is None:
+            aid = item.text(0).strip()
+            if aid and aid != "No applications found":
+                self.aidSelected.emit(aid)
+                self._log(f"AID selected: {aid}")
 
     @Slot()
     def _on_erase(self):
@@ -153,7 +166,6 @@ class CardMaintenanceView(QWidget):
 
     @Slot()
     def _on_read_apps(self):
-        #self.vm.connect_reader()
         self.vm.read_applications()
 
     @Slot(list)
