@@ -127,11 +127,15 @@ class CardMaintenanceView(QWidget):
         self.log_box = QTextEdit()
 
     def _connect_signals(self):
+        # --- Btn
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
         # Read all apps
         self.btn_read_apps.clicked.connect(self._on_read_apps)
+        # Authenticate
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
+
+        # Card View Model
         self.vm.uidRead.connect(self.uid_edit.setText)
         self.vm.statusChanged.connect(self._log)
         self.vm.errorOccurred.connect(lambda m: self._log(f"ERROR: {m}"))
@@ -139,8 +143,11 @@ class CardMaintenanceView(QWidget):
         self.vm.appDeleted.connect(self._on_app_deleted)
         self.vm.logMessage.connect(self._log)
         self.vm.authResult.connect(self._on_auth_result)
+
+        # Combo
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
-        #
+
+        # Tree
         self.apps_tree.itemClicked.connect(self._on_tree_item_clicked)
 
     @Slot(QTreeWidgetItem, int)
@@ -180,8 +187,10 @@ class CardMaintenanceView(QWidget):
             file_id = int(file_id_str.split("0x")[-1], 16)
         except ValueError:
             return
+
         self.fileReadKeySelected.emit(file_id, read_access)
         self.fileWriteKeySelected.emit(file_id, write_access)
+
         self._log(f"File 0x{file_id:02X} selected — Read: {read_access}")
         self._log(f"File 0x{file_id:02X} selected — Read: {write_access}")
 
@@ -294,7 +303,10 @@ class CardMaintenanceView(QWidget):
         labels = {16: "16 hex chars (DES)",
                   32: "32 hex chars (2K3DES / AES)",
                   48: "48 hex chars (3K3DES)"}
+
         self.picc_key_edit.setMaxLength(hex_len)
         self.picc_key_edit.setPlaceholderText(labels.get(hex_len, f"{hex_len} hex chars"))
+
         current = self.picc_key_edit.text().ljust(hex_len, '0')[:hex_len]
+
         self.picc_key_edit.setText(current)

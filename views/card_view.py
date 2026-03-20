@@ -35,27 +35,6 @@ class CardView(QWidget):
 
         layout.addWidget(self.tabs)                       # ← was missing
 
-        # ── License type → File 3 size + label ───────────────────────────
-        #self.write_tab.license_type_combo.currentIndexChanged.connect(
-        #    self.vm.set_license_type
-        #)
-
-        #self.write_tab.license_type_combo.currentIndexChanged.connect(
-        #    self.provision_tab.on_license_type_changed
-        #)
-
-        #self.write_tab.license_type_combo.currentIndexChanged.connect(
-        #    self.provision_tab.license_type_combo.setCurrentIndex
-        #)
-
-        #self.provision_tab.license_type_combo.currentIndexChanged.connect(
-        #    self.write_tab.license_type_combo.setCurrentIndex
-        #)
-
-        #self.provision_tab.license_type_combo.currentIndexChanged.connect(
-        #    self.vm.set_license_type
-        #)
-
         # Set initial state from WriteTab's default (index 0 = Perpetual)
         initial_idx = self.write_tab.license_type_combo.currentIndex()
         self.vm.set_license_type(initial_idx)
@@ -71,30 +50,32 @@ class CardView(QWidget):
     @Slot(str)
     def set_file_id_read_access(self, fid: str, access: str):
         """Sync file ID across Write and Provision tabs."""
-        #print(f"file id:{fid} -> read access: {access}")
         if fid == 1:
             self.read_tab.serial_read_key_edit.setText(access)
+            self.write_tab.serial_r_key_edit.setText(access)
         elif fid == 2:
             self.read_tab.lic_type_read_key_edit.setText(access)
+            self.write_tab.lic_type_r_key_edit.setText(access)
         elif fid == 3:
             self.read_tab.params_read_key_edit.setText(access)
+            self.write_tab.params_r_key_edit.setText(access)
         elif fid == 4:
             self.read_tab.chksum_read_key_edit.setText(access)
+            self.write_tab.chksum_r_key_edit.setText(access)
         else:
             print(f"Unknown Error!")
 
     @Slot(str)
     def set_file_id_write_access(self, fid: str, access: str):
         """Sync file ID across Write and Provision tabs."""
-        # print(f"file id:{fid} -> read access: {access}")
         if fid == 1:
-            self.write_tab.serial_write_key_edit.setText(access)
+            self.write_tab.serial_w_key_edit.setText(access)
         elif fid == 2:
-            self.write_tab.lic_type_write_key_edit.setText(access)
+            self.write_tab.lic_type_w_key_edit.setText(access)
         elif fid == 3:
-            self.write_tab.params_write_key_edit.setText(access)
+            self.write_tab.params_w_key_edit.setText(access)
         elif fid == 4:
-            self.write_tab.chksum_write_key_edit.setText(access)
+            self.write_tab.chksum_w_key_edit.setText(access)
         else:
             print(f"Unknown Error!")
 

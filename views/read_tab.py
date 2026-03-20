@@ -114,8 +114,7 @@ class ReadTab(QWidget):
     def _connect_signals(self):
         self.btn_read.clicked.connect(self._on_read)
         self.vm.statusChanged.connect(self.status_label.setText)
-        self.vm.errorOccurred.connect(
-            lambda m: QMessageBox.critical(self, "Error", m))
+        self.vm.errorOccurred.connect(lambda m: QMessageBox.critical(self, "Error", m))
         self.vm.cardRead.connect(self._populate)
 
     @Slot()
