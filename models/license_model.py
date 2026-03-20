@@ -37,9 +37,6 @@ KEY_TYPE_NAMES = {
     KeyType.AES128: "AES-128 (16 bytes — 32 hex)",
 }
 
-
-
-
 # ── Communication modes ───────────────────────────────────────────────────────
 class CommMode(IntEnum):
     PLAIN     = 0x00
@@ -89,12 +86,20 @@ class LicenseParams:
     num_uses: int = 0          # 0-65535
     hours_per_use: int = 0     # 0-65535
 
+    def invalidate(self) -> None:
+        self.valid = False
+        self.expiration = None
+        self.num_uses = 0
+        self.hours_per_use = 0
+
     def encode(self) -> bytes:
         if self.license_type == LicenseType.PERPETUAL:
             return bytes([0x01 if self.valid else 0x00])
         elif self.license_type == LicenseType.TIME_LIMITED:
+            if self.expiration is None:        # ← ADD THIS GUARD
+                return b"000000000000"
             return self.expiration.strftime("%y%m%d%H%M%S").encode("ascii")
-        elif self.license_type == LicenseType.PER_USE:  # PER_USE
+        elif self.license_type == LicenseType.PER_USE:
             return struct.pack(">HH", self.num_uses, self.hours_per_use)
         else:
             raise ValueError("Unknown license type")
@@ -102,9 +107,13 @@ class LicenseParams:
     @classmethod
     def decode(cls, license_type: LicenseType, raw: bytes) -> "LicenseParams":
         if license_type == LicenseType.PERPETUAL:
-            return cls(license_type=license_type)
+            valid = (raw[0] == 0x01) if raw else False
+            return cls(license_type=license_type, valid=valid)
         if license_type == LicenseType.TIME_LIMITED:
-            dt = datetime.strptime(raw.decode("ascii"), "%y%m%d%H%M%S")
+            raw_str = raw.decode("ascii")
+            if raw_str == "000000000000":
+                return cls(license_type=license_type, expiration=None)
+            dt = datetime.strptime(raw_str, "%y%m%d%H%M%S")
             return cls(license_type=license_type, expiration=dt)
         if license_type == LicenseType.PER_USE:
             n, h = struct.unpack(">HH", raw[:4])

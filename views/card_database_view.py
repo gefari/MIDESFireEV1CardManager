@@ -10,15 +10,16 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont, QColor
 from viewmodels.card_viewmodel import CardViewModel
+from datetime import datetime, timezone
 
 _CSV_COLUMNS = [
     "uid",
-    "picc_master_key",
-    "key1_app_master",
-    "key2_read",
-    "key3_write_chksum",
-    "key4_write_data",
-    "key5_rw_params",
+    "key0 - picc_master",
+    "key1 - app_master",
+    "key2 - File access",
+    "key3 - File access",
+    "key4 - File access",
+    "key5 - File access",
     "timestamp",
     "notes",
 ]
@@ -243,7 +244,7 @@ class CardDatabaseView(QWidget):
             keys[3].hex(),  # Key 3 – Write Checksum
             keys[4].hex(),  # Key 4 – Write Serial/Type
             keys[5].hex(),  # Key 5 – R/W Parameters
-            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "",
         ]
         row = self._append_row_data(data)
@@ -322,7 +323,7 @@ class CardDatabaseView(QWidget):
             keys[2].hex(),
             keys[3].hex(),
             keys[4].hex(),
-            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "", # notes
         ]
         row = self._append_row_data(data)

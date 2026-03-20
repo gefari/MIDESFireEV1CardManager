@@ -143,16 +143,22 @@ class ReadTab(QWidget):
         self.type_edit.setText(self._TYPE_LABELS[card.license_type])
 
         if card.license_type == LicenseType.PERPETUAL:
-            self.params_edit.setText("—")
+            if card.params.valid:
+                self.params_edit.setText("Valid")
+            else:
+                self.params_edit.setText("Expired")
         elif card.license_type == LicenseType.TIME_LIMITED:
             self.params_edit.setText(
                 f"Expires: {card.params.expiration.strftime('%y/%m/%d %H:%M:%S')}"
                 if card.params and card.params.expiration else "—")
         else:
-            self.params_edit.setText(
-                f"Uses: {card.params.num_uses}  |  "
-                f"Hours/use: {card.params.hours_per_use}"
-                if card.params else "—")
+            if card.params.num_uses == 0 and card.params.hours_per_use == 0:
+                self.params_edit.setText("Expired")
+            else:
+                self.params_edit.setText(
+                    f"Uses: {card.params.num_uses}  |  "
+                    f"Hours/use: {card.params.hours_per_use}")
+
 
         self.checksum_edit.setText(f"{card.checksum:08X}")
         valid = card.checksum_valid()

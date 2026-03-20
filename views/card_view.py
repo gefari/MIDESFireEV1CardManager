@@ -36,12 +36,25 @@ class CardView(QWidget):
         layout.addWidget(self.tabs)                       # ← was missing
 
         # ── License type → File 3 size + label ───────────────────────────
-        self.write_tab.license_type_combo.currentIndexChanged.connect(
-            self.vm.set_license_type
-        )
-        self.write_tab.license_type_combo.currentIndexChanged.connect(
-            self.provision_tab.on_license_type_changed
-        )
+        #self.write_tab.license_type_combo.currentIndexChanged.connect(
+        #    self.vm.set_license_type
+        #)
+
+        #self.write_tab.license_type_combo.currentIndexChanged.connect(
+        #    self.provision_tab.on_license_type_changed
+        #)
+
+        #self.write_tab.license_type_combo.currentIndexChanged.connect(
+        #    self.provision_tab.license_type_combo.setCurrentIndex
+        #)
+
+        #self.provision_tab.license_type_combo.currentIndexChanged.connect(
+        #    self.write_tab.license_type_combo.setCurrentIndex
+        #)
+
+        #self.provision_tab.license_type_combo.currentIndexChanged.connect(
+        #    self.vm.set_license_type
+        #)
 
         # Set initial state from WriteTab's default (index 0 = Perpetual)
         initial_idx = self.write_tab.license_type_combo.currentIndex()

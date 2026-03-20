@@ -192,6 +192,9 @@ class ProvisionTab(QWidget):
         root.addWidget(access_box)
 
         # ── Per-file key assignments ───────────────────────────────────────
+        # ══════════════════════════════════════════════════════════════════
+        # LICENSE SERIAL NUMBER
+        # ══════════════════════════════════════════════════════════════════
         f1_box = QGroupBox("File 1 – License Serial Number")
         f1_form = QFormLayout(f1_box)
         f1_form.addRow("Type | Size:", QLabel("Standard Data File  |  12 bytes  (YYMMDDHHMMSS ASCII)"))
@@ -205,9 +208,25 @@ class ProvisionTab(QWidget):
         f1_form.addRow(f1_keys)
         root.addWidget(f1_box)
 
+        # ══════════════════════════════════════════════════════════════════
+        # LICENSE TYPE
+        # ══════════════════════════════════════════════════════════════════
         f2_box = QGroupBox("File 2 – License Type")
         f2_form = QFormLayout(f2_box)
-        f2_form.addRow("Type | Size:", QLabel("Standard Data File  |  1 byte  (0=Perpetual  1=Time Limited  2=Per Use)"))
+
+        lic_hbox = QHBoxLayout()
+        lic_hbox.addWidget(QLabel("License Type:"))
+        self.license_type_combo = QComboBox()
+        self.license_type_combo.addItems([
+            "0 – Perpetual (Type: Standard Data File , Size: 1 byte)",
+            "1 – Time Limited (Type: Standard Data File , Size: 1 byte)",
+            "2 – Per Use",
+        ])
+        lic_hbox.addWidget(self.license_type_combo)
+        lic_hbox.addStretch()
+        f2_form.addRow(lic_hbox)
+
+        #f2_form.addRow("Type | Size:", QLabel("Standard Data File  |  1 byte  (0=Perpetual  1=Time Limited  2=Per Use)"))
         f2_keys = QHBoxLayout()
         f2_keys.addWidget(QLabel("Read key:"))
         f2_keys.addWidget(self._make_key_combo(FILE_TYPE,     "read",  default=2))  # ← was FILE_SERIAL
@@ -219,9 +238,12 @@ class ProvisionTab(QWidget):
 
         root.addWidget(f2_box)
 
+        # ══════════════════════════════════════════════════════════════════
+        # LICENSE PARAMETERS
+        # ══════════════════════════════════════════════════════════════════
         f3_box = QGroupBox("File 3 – License Parameters")
         f3_form = QFormLayout(f3_box)
-        self.f3_type_size_label = QLabel("Standard Data File  |  12 bytes  (YYMMDDHHMMSS ASCII — Time Limited)")
+        self.f3_type_size_label = QLabel("")
         f3_form.addRow("Type | Size:", self.f3_type_size_label)
         f3_keys = QHBoxLayout()
         f3_keys.addWidget(QLabel("Read key:"))
@@ -234,6 +256,9 @@ class ProvisionTab(QWidget):
 
         root.addWidget(f3_box)
 
+        # ══════════════════════════════════════════════════════════════════
+        # LICENSE CHECKSUM
+        # ══════════════════════════════════════════════════════════════════
         f4_box = QGroupBox("File 4 – Checksum")
         f4_form = QFormLayout(f4_box)
         f4_form.addRow("Type | Size:", QLabel("Standard Data File  |  4 bytes  (CRC-32, big-endian)"))
@@ -274,6 +299,11 @@ class ProvisionTab(QWidget):
         self.access_mode_combo.currentIndexChanged.connect(self._on_access_mode_changed)
         self.picc_key_type_combo.currentIndexChanged.connect(self._on_picc_key_type_changed)
 
+        # Update the view model
+        self.license_type_combo.currentIndexChanged.connect(self.vm.set_license_type)
+        # Update the Provision tab UI state
+        self.license_type_combo.currentIndexChanged.connect(self.on_license_type_changed)
+
         self.btn_uid.clicked.connect(self.vm.read_uid)
         self.btn_provision.clicked.connect(self._on_provision)
         self.btn_picc_master_key.clicked.connect(self._on_auth_picc)
@@ -290,6 +320,8 @@ class ProvisionTab(QWidget):
         self.vm.keyChanged.connect(self._on_key_changed)
         self.vm.keyStoreChanged.connect(self._on_keys_changed)
         self.vm.errorOccurred.connect(lambda m: QMessageBox.critical(self, "Error", m))
+
+
 
     # ── Applications tree ─────────────────────────────────────────────────
     @Slot(list)

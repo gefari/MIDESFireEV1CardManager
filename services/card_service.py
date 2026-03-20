@@ -12,6 +12,7 @@ from typing import Optional, List, Callable
 
 from smartcard.System import readers
 from smartcard.CardConnection import CardConnection
+from smartcard.Exceptions import NoCardException, CardConnectionException
 
 from models.license_model import (
     APP_ID, FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
@@ -152,7 +153,18 @@ class CardService:
         if target is None:
             raise CardServiceError("uTrust 3720F HF reader not found.")
         self._conn = target.createConnection()
-        self._conn.connect()
+        try:
+            self._conn.connect()
+        except NoCardException:
+            self._conn = None
+            msg = "Reader found but no card is present."
+            self._log(msg)
+            #raise CardServiceError("Reader found but no card is present.")
+        except CardConnectionException as e:
+            self._conn = None
+            msg = f"Failed to connect to card: {e}"
+            self._log(msg)
+            #raise CardServiceError(msg)
 
     def disconnect(self):
         if self._conn:

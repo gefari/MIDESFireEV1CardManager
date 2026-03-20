@@ -24,7 +24,6 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # ── Tabs ─────────────────────────────────────────────────────────
-        #tabs = QTabWidget()
         self.tabs = QTabWidget()
 
         self.card_view = CardView(self.vm, self.db_tab)  # tab 0

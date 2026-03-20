@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QComboBox, QPushButton,
-    QGroupBox, QSpinBox, QDateTimeEdit, QMessageBox,
+    QGroupBox, QSpinBox, QDateTimeEdit, QMessageBox, QCheckBox
 )
 from PySide6.QtCore import QDateTime, Slot
 from PySide6.QtGui import QFont
@@ -12,9 +12,7 @@ from models.license_model import (
 )
 
 from viewmodels.card_viewmodel import CardViewModel
-
-import datetime
-
+from datetime import datetime, timezone
 
 # ── Shared helper (local copy; move to views/utils.py if shared across tabs) ──
 def mono_font() -> QFont:
@@ -49,6 +47,11 @@ class WriteTab(QWidget):
         app_form.addRow("Application ID (hex):", self.app_id_edit)
         root.addWidget(app_box)
 
+        # ── Global invalidate flag ────────────────────────────────────────────
+        self.chk_invalidate = QCheckBox("⚠  Invalidate card (write all-zero parameters)")
+        self.chk_invalidate.setStyleSheet("color: orange; font-weight: bold;")
+        root.addWidget(self.chk_invalidate)
+
         # ── File 1 – Serial ────────────────────────────────────────
         sn_box = QGroupBox("File 1 – License Serial Number")
         sn_form = QFormLayout(sn_box)
@@ -58,7 +61,7 @@ class WriteTab(QWidget):
         self.serial_edit.setPlaceholderText("YYMMDDHHMMSS")
         self.serial_edit.setMaxLength(12)
         self.serial_edit.setText(
-            datetime.datetime.utcnow().strftime("%y%m%d%H%M%S")
+            datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
         )
 
         self.btn_now = QPushButton("Now")
@@ -170,6 +173,7 @@ class WriteTab(QWidget):
 
         self.license_type_combo.currentIndexChanged.connect(self._refresh_param_visibility)
         self.license_type_combo.currentIndexChanged.connect(self._update_checksum)
+        self.license_type_combo.currentIndexChanged.connect(self.vm.set_license_type)
 
         self.vm.statusChanged.connect(self.status_label.setText)
         self.vm.errorOccurred.connect(
@@ -179,13 +183,15 @@ class WriteTab(QWidget):
             lambda: self.status_label.setText("Card written successfully.")
         )
 
+        self.chk_invalidate.stateChanged.connect(self._on_invalidate_toggled)
+
     # ── Slots ──────────────────────────────────────────────────────────────────
 
     @Slot()
     def _on_stamp_now(self):
         """Stamp current UTC time into serial field and refresh checksum."""
         self.serial_edit.setText(
-            datetime.datetime.utcnow().strftime("%y%m%d%H%M%S")
+            datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
         )
         # _update_checksum fires automatically via serial_edit.textChanged
 
@@ -219,9 +225,9 @@ class WriteTab(QWidget):
     def _build_card_from_ui(self) -> LicenseCard:
         raw_serial = self.serial_edit.text().strip()
         try:
-            dt = datetime.datetime.strptime(raw_serial, "%y%m%d%H%M%S")
+            dt = datetime.strptime(raw_serial, "%y%m%d%H%M%S")
         except ValueError:
-            dt = datetime.datetime.utcnow()
+            dt = datetime.now(timezone.utc)
 
         serial = SerialNumber(dt=dt)
         lt = LicenseType(self.license_type_combo.currentIndex())
@@ -297,4 +303,38 @@ class WriteTab(QWidget):
         self.vm.update_card(card)
         #self.vm.connect_reader()
         self.vm.write_card(app_id)
+
+    @Slot(int)
+    def _on_invalidate_toggled(self, state: int):
+        checked = bool(state)
+        license_type = LicenseType(self.license_type_combo.currentIndex())
+
+        # ── Lock/unlock the params UI fields ─────────────────────────────
+        self.valid_combo.setEnabled(not checked)  # PERPETUAL
+        self.exp_date_edit.setEnabled(not checked)  # TIME_LIMITED
+        self.num_uses_spin.setEnabled(not checked)  # PER_USE
+        self.hours_spin.setEnabled(not checked)  # PER_USE
+
+        if checked:
+            # ── Force UI to zeros ─────────────────────────────────────────
+            if license_type == LicenseType.PERPETUAL:
+                self.valid_combo.setCurrentIndex(1)  # 0 – Invalid
+
+            elif license_type == LicenseType.TIME_LIMITED:
+                self.exp_date_edit.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+
+            elif license_type == LicenseType.PER_USE:
+                self.num_uses_spin.setValue(0)
+                self.hours_spin.setValue(0)
+
+        # ── Rebuild card, invalidate params, update CRC display ──────────
+        card = self._build_card_from_ui()
+        if checked:
+            card.params.invalidate()
+            card.checksum = card.compute_checksum()
+        self.vm.update_card(card)
+        self.checksum_edit.setText(f"{card.compute_checksum():08X}")
+
+
+
 
