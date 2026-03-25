@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QGroupBox,
-    QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QComboBox, QHeaderView,
+    QTextEdit, QMessageBox, QTreeWidget, QTreeWidgetItem, QComboBox, QHeaderView, QFormLayout, QGridLayout
 )
 from PySide6.QtCore import Slot
 from viewmodels.card_viewmodel import CardViewModel
@@ -30,15 +30,30 @@ class CardMaintenanceView(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
 
-        # ── Card UID ───────────────────────────────────────────────
-        uid_box = QGroupBox("Card UID")
-        uid_row = QHBoxLayout(uid_box)
-        self.btn_uid  = QPushButton("Read UID")
-        self.uid_edit = QLineEdit()
-        self.uid_edit.setReadOnly(True)
-        uid_row.addWidget(self.btn_uid)
-        uid_row.addWidget(self.uid_edit)
-        root.addWidget(uid_box)
+        # ── Card Info ───────────────────────────────────────────────
+        card_info_box = QGroupBox("Card Info")
+        card_info_form_grid = QGridLayout()
+
+        self.btn_get_ver  = QPushButton("Get Version (0x90 0x60)")
+        card_info_form_grid.addWidget(self.btn_get_ver, 0, 0)
+
+        self.hw_info_edit = QLineEdit()
+        self.hw_info_edit.setReadOnly(True)
+        card_info_form_grid.addWidget(QLabel("HW Version:"), 1, 0)
+        card_info_form_grid.addWidget(self.hw_info_edit, 1, 1)
+
+        self.sw_info_edit = QLineEdit()
+        self.sw_info_edit.setReadOnly(True)
+        card_info_form_grid.addWidget(QLabel("SW Version:"), 2, 0)
+        card_info_form_grid.addWidget(self.sw_info_edit, 2, 1)
+
+        self.production_info_uid_edit = QLineEdit()
+        self.production_info_uid_edit.setReadOnly(True)
+        card_info_form_grid.addWidget(QLabel("Prod. Info:"), 3, 0)
+        card_info_form_grid.addWidget(self.production_info_uid_edit, 3 ,1)
+
+        card_info_box.setLayout(card_info_form_grid)
+        root.addWidget(card_info_box)
 
         # ── Applications ───────────────────────────────────────────────────
         app_box = QGroupBox("Card Applications")
@@ -128,7 +143,7 @@ class CardMaintenanceView(QWidget):
 
     def _connect_signals(self):
         # --- Btn
-        self.btn_uid.clicked.connect(self.vm.read_uid)
+        self.btn_get_ver.clicked.connect(self.vm.read_uid)
         self.btn_erase.clicked.connect(self._on_erase)
         # Read all apps
         self.btn_read_apps.clicked.connect(self._on_read_apps)
@@ -136,7 +151,7 @@ class CardMaintenanceView(QWidget):
         self.btn_auth_picc.clicked.connect(self._on_auth_picc)
 
         # Card View Model
-        self.vm.uidRead.connect(self.uid_edit.setText)
+        self.vm.cardInfo.connect(self._on_card_info)
         self.vm.statusChanged.connect(self._log)
         self.vm.errorOccurred.connect(lambda m: self._log(f"ERROR: {m}"))
         self.vm.appsRead.connect(self._populate_apps)
@@ -277,10 +292,16 @@ class CardMaintenanceView(QWidget):
             self._log(f"Delete App - aid:{aid}, PICC key:{self.picc_key_edit.text()}")
             self.vm.delete_application(aid, picc_key_hex)
 
+    def _on_card_info(self, hw_info: bytes, sw_info: bytes, prod_info: bytes):
+        self.production_info_uid_edit.setText(f"{prod_info.hex(' ').upper()}")
+        self.hw_info_edit.setText(f"{hw_info.hex(' ').upper()}")
+        self.sw_info_edit.setText(f"{sw_info.hex(' ').upper()}")
+
+
     @Slot(str)
     def _on_app_deleted(self, aid: str):
         self._log(f"Application {aid} deleted.")
-        self.vm.connect_reader()
+        #self.vm.connect_reader()
         self.vm.read_applications()
 
     @Slot()

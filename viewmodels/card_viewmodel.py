@@ -20,7 +20,7 @@ class CardViewModel(QObject):
     errorOccurred   = Signal(str)
     cardRead        = Signal(LicenseCard)
     cardWritten     = Signal()
-    uidRead         = Signal(str)
+    cardInfo        = Signal(bytes, bytes, bytes)
     readerFound     = Signal(str)
     authResult      = Signal(bool, str)
     keyStoreChanged = Signal()
@@ -62,7 +62,7 @@ class CardViewModel(QObject):
         DESFIRE_ATR = "3B 81 80 01 80 80"
         self.cardInserted.emit(atr)
         if atr.upper() == DESFIRE_ATR:
-            self.statusChanged.emit(f"DESFire card detected — ATR: {atr}")
+            self.statusChanged.emit(f"Card detected — ATR: {atr}")
         else:
             self.statusChanged.emit(f"⚠ Unknown card type — ATR: {atr}")
 
@@ -209,9 +209,11 @@ class CardViewModel(QObject):
     @Slot()
     def read_uid(self):
         try:
-            uid = self._service.get_uid()
-            self.uidRead.emit(uid)
-            self.statusChanged.emit(f"UID: {uid}")
+            hw_info, sw_info, prod_info = self._service.get_uid()
+            self.cardInfo.emit(hw_info, sw_info, prod_info)
+            uid_bytes = prod_info[:7]
+            msg = " ".join(f"{b:02X}" for b in uid_bytes)
+            self.statusChanged.emit(f"UID: {msg}")
         except CardServiceError as e:
             self.errorOccurred.emit(str(e))
 

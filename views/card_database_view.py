@@ -136,7 +136,7 @@ class CardDatabaseView(QWidget):
         self.btn_clear.clicked.connect(self._on_clear)
 
         # UID is read from the card when a new row is added
-        self.vm.uidRead.connect(self._on_uid_read)
+        self.vm.cardRead.connect(self._on_card_info_read)
 
 
 
@@ -253,7 +253,7 @@ class CardDatabaseView(QWidget):
         self._update_status()
 
     @Slot(str)
-    def _on_uid_read(self, uid: str):
+    def _on_card_info_read(self, uid: str):
         """
         When a UID is read from the card, write it into the selected row's UID cell.
         If no row is selected, writes to the last row.

@@ -215,29 +215,30 @@ class CardService:
         }
 
     # ── UID ───────────────────────────────────────────────────────────────────
-    def get_uid(self) -> str:
+    def get_uid(self) -> tuple[bytes, bytes, bytes]:
         """
-        Read card UID via GetVersion (3-step, no auth required).
-        Returns the 7-byte UID as a hex string.
-        """
+    Read card UID via GetVersion (3-step, no auth required).
+    Returns:
+        - frame1 (bytes): hardware info
+        - frame2 (bytes): software info
+        - frame3 (bytes): production info (UID, batch, week, year)
+    """
         # Step 1: GetVersion
-        resp, sw1, sw2 = self._transmit(_apdu(INS_GET_VERSION))
+        hw_info, sw1, sw2 = self._transmit(_apdu(INS_GET_VERSION))
         if sw1 != 0x91 or sw2 != 0xAF:
             raise CardServiceError(f"GetVersion step 1 failed: {sw1:02X} {sw2:02X}")
 
-        # Step 2: Additional frame (hardware info)
-        resp, sw1, sw2 = self._transmit(_apdu(INS_ADDITIONAL_FRAME))
+        # Step 2: Additional frame
+        sw_info, sw1, sw2 = self._transmit(_apdu(INS_ADDITIONAL_FRAME))
         if sw1 != 0x91 or sw2 != 0xAF:
             raise CardServiceError(f"GetVersion step 2 failed: {sw1:02X} {sw2:02X}")
 
-        # Step 3: Additional frame → contains UID in bytes 0-6
-        resp, sw1, sw2 = self._transmit(_apdu(INS_ADDITIONAL_FRAME))
+        # Step 3: Additional frame
+        prod_info, sw1, sw2 = self._transmit(_apdu(INS_ADDITIONAL_FRAME))
         if sw1 != 0x91 or sw2 != 0x00:
             raise CardServiceError(f"GetVersion step 3 failed: {sw1:02X} {sw2:02X}")
 
-        # Response layout: 7-byte UID | 4-byte batch | 1-byte week | 1-byte year
-        uid_bytes = resp[:7]
-        return " ".join(f"{b:02X}" for b in uid_bytes)
+        return hw_info, sw_info, prod_info
 
     def get_file_settings(self, file_id: int) -> dict:
         """

@@ -313,7 +313,7 @@ class ProvisionTab(QWidget):
         self.btn_copy_new_key.clicked.connect(self._on_copy_new_key_to_db)
         self.btn_change_key.clicked.connect(self._on_change_key)
 
-        self.vm.uidRead.connect(self.uid_edit.setText)
+        self.vm.cardInfo.connect(self._on_card_info)
         self.vm.keyStoreChanged.connect(self._refresh_key_combos)
         self.vm.appsRead.connect(self._populate_apps)
         self.vm.authResult.connect(self._on_auth_result)
@@ -446,6 +446,11 @@ class ProvisionTab(QWidget):
         new_hex = self.new_key_edit.text().replace(" ", "")
         if new_hex:
             self.db_view.copy_keys_to_new_row(app_master_key_hex=new_hex)
+
+    @Slot()
+    def _on_card_info(self, hw_info: bytes, sw_info: bytes, prod_info: bytes):
+        self.uid_edit.setText(f"{prod_info.hex(' ').upper()}")
+
 
     @Slot()
     def _on_change_key(self):

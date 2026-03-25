@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         self.vm.logMessage.connect(self.log_text.append)
         self.vm.statusChanged.connect(self._on_status_changed)
         self.vm.errorOccurred.connect(lambda m: self.log_text.append(f"❌ ERROR: {m}"))
+        self.vm.cardInfo.connect(self._on_card_info)
 
         # Graceful shutdown
         app.aboutToQuit.connect(self.vm.stop)
@@ -133,19 +134,15 @@ class MainWindow(QMainWindow):
         self.vm.find_reader()
 
     def _disconnect_reader(self):
-        self.vm.disconnect_reader()
+        #self.vm.disconnect_reader()
         self.lbl_card_status.setText("No card detected")
         self.lbl_card_status.setStyleSheet("color: gray; font-style: italic;")
 
     def _on_card_inserted(self, atr: str):
         self.lbl_card_status.setText("✅ Card present")
         self.lbl_card_status.setStyleSheet("color: green; font-weight: bold;")
-        DESFIRE_ATR_PREFIX = "3B8180"
-        if atr.replace(" ", "").upper().startswith(DESFIRE_ATR_PREFIX):
-            self.lbl_card_type.setText("DESFire EV1 card detected")
-            self.vm.connect_reader()
-        else:
-            self.lbl_card_type.setText("⚠ Unknown card type")
+        self.vm.connect_reader()
+
 
     def _on_card_removed(self):
         self.lbl_card_status.setText("⚠️ Card removed")
@@ -154,7 +151,8 @@ class MainWindow(QMainWindow):
         self.vm.disconnect_reader()
 
     def _on_reader_found(self):
-        self.vm.connect_reader()
+        #self.vm.connect_reader()
+        pass
 
     def _on_status_changed(self, status: str):
         if "Reader found" in status:
@@ -166,6 +164,18 @@ class MainWindow(QMainWindow):
         elif "Card removed." in status:
             self.lbl_reader_description.setText("uTrust 3720 (Card removed)")
         self.log_text.append(status)
+
+    def _on_card_info(self, hw_info: bytes, sw_info: bytes, prod_info: bytes):
+        #self.vm.connect_reader()
+        if hw_info[3] == 0x01:
+            self.lbl_card_type.setText("DESFire EV1 card detected")
+            #self.vm.connect_reader()
+        elif hw_info[3] == 0x33:
+            self.lbl_card_type.setText("DESFire EV3 card detected")
+            #self.vm.connect_reader()
+        else:
+            self.lbl_card_type.setText("⚠ Unknown card type")
+
 
 
 def main():
