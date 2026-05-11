@@ -8,7 +8,7 @@ from PySide6.QtGui import QFont
 
 from models.license_model import (
     LicenseCard, LicenseType,
-    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_TEST, FILE_CHECKSUM,
 )
 from viewmodels.card_viewmodel import CardViewModel
 
@@ -87,20 +87,33 @@ class ReadTab(QWidget):
 
         root.addWidget(f3_box)
 
-        # ── File 4 – Checksum ──────────────────────────────────────
-        f4_box = QGroupBox("File 4 – Checksum")
+        # ── File 4 – Test ──────────────────────────────────────────
+        f4_box = QGroupBox("File 4 – Test")
         f4_form = QFormLayout(f4_box)
+        self.test_edit = QLineEdit()
+        self.test_edit.setReadOnly(True)
+        self.test_edit.setFont(mono_font())
+        f4_form.addRow("Value (hex):", self.test_edit)
+
+        self.test_read_key_edit = QLineEdit()
+        f4_form.addRow("Read key:", self.test_read_key_edit)
+
+        root.addWidget(f4_box)
+
+        # ── File 5 – Checksum ──────────────────────────────────────
+        f5_box = QGroupBox("File 5 – Checksum")
+        f5_form = QFormLayout(f5_box)
         self.checksum_edit = QLineEdit()
         self.checksum_edit.setReadOnly(True)
         self.checksum_edit.setFont(mono_font())
         self.checksum_valid_label = QLabel("")
-        f4_form.addRow("CRC-32:",   self.checksum_edit)
-        f4_form.addRow("Validity:", self.checksum_valid_label)
+        f5_form.addRow("CRC-32:",   self.checksum_edit)
+        f5_form.addRow("Validity:", self.checksum_valid_label)
 
         self.chksum_read_key_edit = QLineEdit()
-        f4_form.addRow("Read key:", self.chksum_read_key_edit)
+        f5_form.addRow("Read key:", self.chksum_read_key_edit)
 
-        root.addWidget(f4_box)
+        root.addWidget(f5_box)
 
         # ── Read button ────────────────────────────────────────────
         self.btn_read = QPushButton("⟳  Read Card")
@@ -129,9 +142,10 @@ class ReadTab(QWidget):
 
         keys = {
             "app": self.app_read_key_edit.text().strip(),
-            FILE_SERIAL: self.serial_read_key_edit.text().strip(),
-            FILE_TYPE: self.lic_type_read_key_edit.text().strip(),
-            FILE_PARAMS: self.params_read_key_edit.text().strip(),
+            FILE_SERIAL:   self.serial_read_key_edit.text().strip(),
+            FILE_TYPE:     self.lic_type_read_key_edit.text().strip(),
+            FILE_PARAMS:   self.params_read_key_edit.text().strip(),
+            FILE_TEST:     self.test_read_key_edit.text().strip(),
             FILE_CHECKSUM: self.chksum_read_key_edit.text().strip(),
         }
         self.vm.read_card(app_id, keys)
@@ -158,6 +172,8 @@ class ReadTab(QWidget):
                     f"Uses: {card.params.num_uses}  |  "
                     f"Hours/use: {card.params.hours_per_use}")
 
+
+        self.test_edit.setText(f"{card.test_byte:02X}")
 
         self.checksum_edit.setText(f"{card.checksum:08X}")
         valid = card.checksum_valid()

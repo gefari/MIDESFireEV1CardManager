@@ -48,34 +48,34 @@ class CardView(QWidget):
         self.provision_tab.app_id_edit.setText(aid)
 
     @Slot(str)
-    def set_file_id_read_access(self, fid: str, access: str):
-        """Sync file ID across Write and Provision tabs."""
-        if fid == 1:
-            self.read_tab.serial_read_key_edit.setText(access)
-            self.write_tab.serial_r_key_edit.setText(access)
-        elif fid == 2:
-            self.read_tab.lic_type_read_key_edit.setText(access)
-            self.write_tab.lic_type_r_key_edit.setText(access)
-        elif fid == 3:
-            self.read_tab.params_read_key_edit.setText(access)
-            self.write_tab.params_r_key_edit.setText(access)
-        elif fid == 4:
-            self.read_tab.chksum_read_key_edit.setText(access)
-            self.write_tab.chksum_r_key_edit.setText(access)
-        else:
-            print(f"Unknown Error!")
+    def set_file_id_read_access(self, fid: int, access: str):
+        """Populate read-key hint labels in Read/Write tabs from the Maintenance tree.
+
+        The access value ("Key 2", "Free", etc.) is an access descriptor, not a
+        hex key string, so we clear the hex override fields — the KeyStore fallback
+        then picks the right key automatically.
+        """
+        _MAP = {
+            1: (self.read_tab.serial_read_key_edit,   self.write_tab.serial_r_key_edit),
+            2: (self.read_tab.lic_type_read_key_edit, self.write_tab.lic_type_r_key_edit),
+            3: (self.read_tab.params_read_key_edit,   self.write_tab.params_r_key_edit),
+            4: (self.read_tab.test_read_key_edit,     self.write_tab.test_r_key_edit),
+            5: (self.read_tab.chksum_read_key_edit,   self.write_tab.chksum_r_key_edit),
+        }
+        for edit in _MAP.get(fid, ()):
+            edit.clear()
 
     @Slot(str)
-    def set_file_id_write_access(self, fid: str, access: str):
-        """Sync file ID across Write and Provision tabs."""
-        if fid == 1:
-            self.write_tab.serial_w_key_edit.setText(access)
-        elif fid == 2:
-            self.write_tab.lic_type_w_key_edit.setText(access)
-        elif fid == 3:
-            self.write_tab.params_w_key_edit.setText(access)
-        elif fid == 4:
-            self.write_tab.chksum_w_key_edit.setText(access)
-        else:
-            print(f"Unknown Error!")
+    def set_file_id_write_access(self, fid: int, access: str):
+        """Populate write-key hint labels in the Write tab from the Maintenance tree."""
+        _MAP = {
+            1: self.write_tab.serial_w_key_edit,
+            2: self.write_tab.lic_type_w_key_edit,
+            3: self.write_tab.params_w_key_edit,
+            4: self.write_tab.test_w_key_edit,
+            5: self.write_tab.chksum_w_key_edit,
+        }
+        edit = _MAP.get(fid)
+        if edit:
+            edit.clear()
 

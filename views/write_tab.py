@@ -8,7 +8,7 @@ from PySide6.QtGui import QFont
 
 from models.license_model import (
     LicenseCard, LicenseType, LicenseParams, SerialNumber, CommMode,
-    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_TEST, FILE_CHECKSUM,
 )
 
 from viewmodels.card_viewmodel import CardViewModel
@@ -166,8 +166,30 @@ class WriteTab(QWidget):
 
         root.addWidget(self.params_box)
 
-        # ── File 4 – Checksum ──────────────────────────────────────
-        chk_box = QGroupBox("File 4 – Checksum")
+        # ── File 4 – Test ──────────────────────────────────────────
+        test_box = QGroupBox("File 4 – Test")
+        test_form = QFormLayout(test_box)
+        self.test_spin = QSpinBox()
+        self.test_spin.setRange(0, 255)
+        self.test_spin.setPrefix("0x")
+        self.test_spin.setDisplayIntegerBase(16)
+        test_form.addRow("Value (0–255):", self.test_spin)
+
+        test_keys = QHBoxLayout()
+        test_keys.addWidget(QLabel("Write key:"))
+        self.test_w_key_edit = QLineEdit()
+        test_keys.addWidget(self.test_w_key_edit)
+        test_keys.addSpacing(16)
+        test_keys.addWidget(QLabel("Read key:"))
+        self.test_r_key_edit = QLineEdit()
+        test_keys.addWidget(self.test_r_key_edit)
+        test_keys.addStretch()
+        test_form.addRow(test_keys)
+
+        root.addWidget(test_box)
+
+        # ── File 5 – Checksum ──────────────────────────────────────
+        chk_box = QGroupBox("File 5 – Checksum")
         chk_form = QFormLayout(chk_box)
         self.checksum_edit = QLineEdit()
         self.checksum_edit.setReadOnly(True)
@@ -222,6 +244,7 @@ class WriteTab(QWidget):
         # --- Spin
         self.num_uses_spin.valueChanged.connect(self._update_checksum)
         self.hours_spin.valueChanged.connect(self._update_checksum)
+        self.test_spin.valueChanged.connect(self._update_checksum)
 
         # --- Combo Box
         self.valid_combo.currentIndexChanged.connect(self._update_checksum)
@@ -300,7 +323,8 @@ class WriteTab(QWidget):
             )
 
         card = LicenseCard(serial=serial, license_type=lt,
-                           params=params, comm_mode=CommMode.PLAIN)
+                           params=params, test_byte=self.test_spin.value(),
+                           comm_mode=CommMode.PLAIN)
         card.checksum = card.compute_checksum()
         return card
 
@@ -335,9 +359,10 @@ class WriteTab(QWidget):
 
         keys = {
             "app": self.aid_r_key_edit.text().strip(),
-            FILE_SERIAL: self.serial_r_key_edit.text().strip(),
-            FILE_TYPE: self.lic_type_r_key_edit.text().strip(),
-            FILE_PARAMS: self.params_r_key_edit.text().strip(),
+            FILE_SERIAL:   self.serial_r_key_edit.text().strip(),
+            FILE_TYPE:     self.lic_type_r_key_edit.text().strip(),
+            FILE_PARAMS:   self.params_r_key_edit.text().strip(),
+            FILE_TEST:     self.test_r_key_edit.text().strip(),
             FILE_CHECKSUM: self.chksum_r_key_edit.text().strip(),
         }
         self.vm.read_card(app_id, keys)
@@ -367,12 +392,10 @@ class WriteTab(QWidget):
 
         # Push per-file write keys into the ViewModel before writing
         #self.vm.set_file_key(FILE_SERIAL, "write", self._key_index_from_edit(self.serial_write_key_edit))
-        self.vm.set_file_key(FILE_SERIAL, "write", self._key_index_from_edit(self.serial_w_key_edit))
-        #self.vm.set_file_key(FILE_TYPE, "write", self._key_index_from_edit(self.lic_type_write_key_edit))
-        self.vm.set_file_key(FILE_TYPE, "write", self._key_index_from_edit(self.lic_type_w_key_edit))
-        #self.vm.set_file_key(FILE_PARAMS, "write", self._key_index_from_edit(self.params_write_key_edit))
-        self.vm.set_file_key(FILE_PARAMS, "write", self._key_index_from_edit(self.params_w_key_edit))
-        #self.vm.set_file_key(FILE_CHECKSUM, "write", self._key_index_from_edit(self.chksum_write_key_edit))
+        self.vm.set_file_key(FILE_SERIAL,   "write", self._key_index_from_edit(self.serial_w_key_edit))
+        self.vm.set_file_key(FILE_TYPE,     "write", self._key_index_from_edit(self.lic_type_w_key_edit))
+        self.vm.set_file_key(FILE_PARAMS,   "write", self._key_index_from_edit(self.params_w_key_edit))
+        self.vm.set_file_key(FILE_TEST,     "write", self._key_index_from_edit(self.test_w_key_edit))
         self.vm.set_file_key(FILE_CHECKSUM, "write", self._key_index_from_edit(self.chksum_w_key_edit))
 
         card = self._build_card_from_ui()
@@ -429,14 +452,14 @@ class WriteTab(QWidget):
                 pass
             self._refresh_param_visibility(0)
         elif card.license_type == LicenseType.TIME_LIMITED:
-            # Select License Combo Box
             self.license_type_combo.setCurrentIndex(1)
             dt = card.params.expiration
-            q_dt = QDateTime(
-                dt.year, dt.month, dt.day,
-                dt.hour, dt.minute, dt.second
-            )
-            self.exp_date_edit.setDateTime(q_dt)
+            if dt is not None:
+                self.exp_date_edit.setDateTime(
+                    QDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+                )
+            else:
+                self.exp_date_edit.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
             self._refresh_param_visibility(1)
         elif card.license_type == LicenseType.PER_USE:
             # Select License Combo Box
@@ -449,6 +472,8 @@ class WriteTab(QWidget):
             pass
 
 
+
+        self.test_spin.setValue(card.test_byte)
 
         self.checksum_edit.setText(f"{card.checksum:08X}")
         valid = card.checksum_valid()

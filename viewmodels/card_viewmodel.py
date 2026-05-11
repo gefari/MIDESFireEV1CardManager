@@ -2,7 +2,7 @@ import struct
 from PySide6.QtCore import QObject, Signal, Slot
 from models.license_model import (
     LicenseCard, CommMode, KeyStore, KEY_FREE,
-    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_TEST, FILE_CHECKSUM,
     LicenseType, FILE_PARAMS_SIZE,
     SerialNumber,   # ← add this
     LicenseParams
@@ -49,6 +49,7 @@ class CardViewModel(QObject):
             FILE_SERIAL:   {"read": 2, "write": 4},
             FILE_TYPE:     {"read": 2, "write": 4},
             FILE_PARAMS:   {"read": 5, "write": 5},
+            FILE_TEST:     {"read": 2, "write": 4},
             FILE_CHECKSUM: {"read": 2, "write": 3},
         }
 
@@ -228,11 +229,14 @@ class CardViewModel(QObject):
                 comm_mode=self._comm_mode,
                 params_size=params_size,  # ← new
                 access_rights={
-                    FILE_SERIAL: (self._nibble(FILE_SERIAL, "read"), self._nibble(FILE_SERIAL, "write")),
-                    FILE_TYPE: (self._nibble(FILE_TYPE, "read"), self._nibble(FILE_TYPE, "write")),
-                    FILE_PARAMS: (self._nibble(FILE_PARAMS, "read"), self._nibble(FILE_PARAMS, "write")),
+                    FILE_SERIAL:   (self._nibble(FILE_SERIAL,   "read"), self._nibble(FILE_SERIAL,   "write")),
+                    FILE_TYPE:     (self._nibble(FILE_TYPE,     "read"), self._nibble(FILE_TYPE,     "write")),
+                    FILE_PARAMS:   (self._nibble(FILE_PARAMS,   "read"), self._nibble(FILE_PARAMS,   "write")),
+                    FILE_TEST:     (self._nibble(FILE_TEST,     "read"), self._nibble(FILE_TEST,     "write")),
                     FILE_CHECKSUM: (self._nibble(FILE_CHECKSUM, "read"), self._nibble(FILE_CHECKSUM, "write")),
                 },
+                write_test_key=self._read_key(FILE_TEST, "write"),
+                key_number_test=self._key_no(FILE_TEST, "write"),
                 log=self.provisionLog.emit,
             )
             self.statusChanged.emit(
@@ -254,10 +258,12 @@ class CardViewModel(QObject):
                 write_serial_key=self._read_key(FILE_SERIAL, "write"),
                 write_type_key=self._read_key(FILE_TYPE, "write"),
                 write_params_key=self._read_key(FILE_PARAMS, "write"),
+                write_test_key=self._read_key(FILE_TEST, "write"),
                 write_chksum_key=self._read_key(FILE_CHECKSUM, "write"),
                 key_number_serial=self._key_no(FILE_SERIAL, "write"),
                 key_number_type=self._key_no(FILE_TYPE, "write"),
                 key_number_params=self._key_no(FILE_PARAMS, "write"),
+                key_number_test=self._key_no(FILE_TEST, "write"),
                 key_number_chksum=self._key_no(FILE_CHECKSUM, "write"),
             )
             self.cardWritten.emit()
@@ -304,6 +310,9 @@ class CardViewModel(QObject):
                 return f"{hex_dash(raw)}"
 
             if file_id == FILE_PARAMS:
+                return f"{hex_dash(raw)}"
+
+            if file_id == FILE_TEST:
                 return f"{hex_dash(raw)}"
 
             if file_id == FILE_CHECKSUM:
@@ -368,24 +377,30 @@ class CardViewModel(QObject):
             raw_params = _read_file(FILE_PARAMS)
             params = LicenseParams.decode(license_type, raw_params)
 
-            # ── File 4 – Checksum ─────────────────────────────────────
+            # ── File 4 – Test ─────────────────────────────────────────
+            raw_test = _read_file(FILE_TEST)
+            test_byte = raw_test[0] if raw_test else 0
+
+            # ── File 5 – Checksum ─────────────────────────────────────
             raw_chksum = _read_file(FILE_CHECKSUM)
-            #checksum = struct.unpack_from("<I", raw_chksum)[0]
             checksum = struct.unpack_from(">I", raw_chksum)[0]
 
             card = LicenseCard(
                 serial=serial,
                 license_type=license_type,
                 params=params,
+                test_byte=test_byte,
                 checksum=checksum,
             )
             self._card = card
             self.cardRead.emit(card)
+            crc_ok = card.checksum_valid()
+            icon = "✅" if crc_ok else "⚠"
+            crc_label = "OK" if crc_ok else "INVALID — card may not have been written yet"
             self.statusChanged.emit(
-                f"✅ Card read — Serial: {serial}, "
+                f"{icon} Card read — Serial: {serial}, "
                 f"Type: {license_type.name}, "
-                f"Params: {params.valid}, "
-                f"CRC: {'OK' if card.checksum_valid() else 'INVALID'}"
+                f"CRC: {crc_label}"
             )
 
         except (CardServiceError, ValueError, IndexError) as e:

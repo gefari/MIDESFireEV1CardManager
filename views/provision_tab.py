@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Slot
 from PySide6.QtGui import QFont, QColor
 from models.license_model import (
-    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM
+    FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_TEST, FILE_CHECKSUM
 )
 from viewmodels.card_viewmodel import CardViewModel
 
@@ -28,6 +28,8 @@ class ProvisionTab(QWidget):
         (FILE_TYPE,     "write"): 4,
         (FILE_PARAMS,   "read"):  5,
         (FILE_PARAMS,   "write"): 5,
+        (FILE_TEST,     "read"):  2,
+        (FILE_TEST,     "write"): 4,
         (FILE_CHECKSUM, "read"):  2,
         (FILE_CHECKSUM, "write"): 3,
     }
@@ -257,21 +259,38 @@ class ProvisionTab(QWidget):
         root.addWidget(f3_box)
 
         # ══════════════════════════════════════════════════════════════════
-        # LICENSE CHECKSUM
+        # TEST
         # ══════════════════════════════════════════════════════════════════
-        f4_box = QGroupBox("File 4 – Checksum")
+        f4_box = QGroupBox("File 4 – Test")
         f4_form = QFormLayout(f4_box)
-        f4_form.addRow("Type | Size:", QLabel("Standard Data File  |  4 bytes  (CRC-32, big-endian)"))
+        f4_form.addRow("Type | Size:", QLabel("Standard Data File  |  1 byte"))
         f4_keys = QHBoxLayout()
         f4_keys.addWidget(QLabel("Read key:"))
-        f4_keys.addWidget(self._make_key_combo(FILE_CHECKSUM, "read",  default=2))  # ← was FILE_SERIAL
+        f4_keys.addWidget(self._make_key_combo(FILE_TEST, "read",  default=2))
         f4_keys.addSpacing(16)
         f4_keys.addWidget(QLabel("Write key:"))
-        f4_keys.addWidget(self._make_key_combo(FILE_CHECKSUM, "write", default=3))  # ← was FILE_SERIAL
+        f4_keys.addWidget(self._make_key_combo(FILE_TEST, "write", default=4))
         f4_keys.addStretch()
         f4_form.addRow(f4_keys)
 
         root.addWidget(f4_box)
+
+        # ══════════════════════════════════════════════════════════════════
+        # LICENSE CHECKSUM
+        # ══════════════════════════════════════════════════════════════════
+        f5_box = QGroupBox("File 5 – Checksum")
+        f5_form = QFormLayout(f5_box)
+        f5_form.addRow("Type | Size:", QLabel("Standard Data File  |  4 bytes  (CRC-32, big-endian)"))
+        f5_keys = QHBoxLayout()
+        f5_keys.addWidget(QLabel("Read key:"))
+        f5_keys.addWidget(self._make_key_combo(FILE_CHECKSUM, "read",  default=2))
+        f5_keys.addSpacing(16)
+        f5_keys.addWidget(QLabel("Write key:"))
+        f5_keys.addWidget(self._make_key_combo(FILE_CHECKSUM, "write", default=3))
+        f5_keys.addStretch()
+        f5_form.addRow(f5_keys)
+
+        root.addWidget(f5_box)
 
         # ── Provision button ───────────────────────────────────────────────
         self.btn_provision = QPushButton("⚙  Provision Card (Create App + Files)")

@@ -13,7 +13,8 @@ APP_ID = bytes([0x01, 0x02, 0x03])          # 0x010203
 FILE_SERIAL   = 0x01
 FILE_TYPE     = 0x02
 FILE_PARAMS   = 0x03
-FILE_CHECKSUM = 0x04
+FILE_TEST     = 0x04
+FILE_CHECKSUM = 0x05
 
 # ── Access Keys ───────────────────────────────────────────────────────────────
 KEY_APP_COMMON  = 0x00   # Key 1 – application common key
@@ -64,13 +65,20 @@ class SerialNumber:
     def encode(self) -> bytes:
         return self.dt.strftime("%y%m%d%H%M%S").encode("ascii")   # 12 bytes
 
+    _UNWRITTEN = datetime(2000, 1, 1, 0, 0, 0)
+
     @classmethod
     def decode(cls, raw: bytes) -> "SerialNumber":
-        s = raw.decode("ascii")
-        dt = datetime.strptime(s, "%y%m%d%H%M%S")
-        return cls(dt=dt)
+        try:
+            s = raw.decode("ascii")
+            dt = datetime.strptime(s, "%y%m%d%H%M%S")
+            return cls(dt=dt)
+        except (ValueError, UnicodeDecodeError):
+            return cls(dt=cls._UNWRITTEN)
 
     def __str__(self):
+        if self.dt == self._UNWRITTEN:
+            return "— (not written)"
         return self.dt.strftime("%y%m%d%H%M%S")
 
 # ── License Parameters ────────────────────────────────────────────────────────
@@ -126,14 +134,16 @@ class LicenseCard:
     serial:       SerialNumber  = field(default_factory=SerialNumber)
     license_type: LicenseType   = LicenseType.PERPETUAL
     params:       LicenseParams = field(default_factory=LicenseParams)
+    test_byte:    int           = 0          # File 4 – single test byte (0–255)
     checksum:     int           = 0          # CRC-32 (stored value)
     comm_mode:    CommMode      = CommMode.PLAIN
 
     def compute_checksum(self) -> int:
-        """CRC-32 over Serial + Type byte + Params."""
+        """CRC-32 over Serial + Type byte + Params + Test byte."""
         payload  = self.serial.encode()
         payload += bytes([int(self.license_type)])
         payload += self.params.encode()
+        payload += bytes([self.test_byte & 0xFF])
         checksum = zlib.crc32(payload) & 0xFFFF_FFFF
         return checksum
 

@@ -15,7 +15,7 @@ from smartcard.CardConnection import CardConnection
 from smartcard.Exceptions import NoCardException, CardConnectionException
 
 from models.license_model import (
-    APP_ID, FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_CHECKSUM,
+    APP_ID, FILE_SERIAL, FILE_TYPE, FILE_PARAMS, FILE_TEST, FILE_CHECKSUM,
     LicenseCard, LicenseType, LicenseParams, SerialNumber, CommMode,
 )
 
@@ -466,7 +466,8 @@ class CardService:
     # ── Application management ────────────────────────────────────────────────
     def provision(self, app_id: bytes, key_settings: int,
                   comm_mode: CommMode, access_rights: dict,
-                  params_size: int = 12,  # ← new
+                  params_size: int = 12,
+                  write_test_key: bytes = None, key_number_test: int = None,
                   log=None) -> None:
 
         def _log(msg):
@@ -518,10 +519,15 @@ class CardService:
 
         r = access_rights
 
-        _create_std_file(FILE_SERIAL, 12, *r[FILE_SERIAL])
-        _create_std_file(FILE_TYPE, 1, *r[FILE_TYPE])
-        _create_std_file(FILE_PARAMS, params_size, *r[FILE_PARAMS])  # ← dynamic
-        _create_std_file(FILE_CHECKSUM, 4, *r[FILE_CHECKSUM])
+        _create_std_file(FILE_SERIAL,   12,         *r[FILE_SERIAL])
+        _create_std_file(FILE_TYPE,     1,          *r[FILE_TYPE])
+        _create_std_file(FILE_PARAMS,   params_size, *r[FILE_PARAMS])
+        _create_std_file(FILE_TEST,     1,          *r[FILE_TEST])
+        if key_number_test is not None and write_test_key is not None:
+            self.authenticate_plain(key_no=key_number_test, key=write_test_key)
+        self._write_file(FILE_TEST, 0, b'\x00')
+        _log("File 04 initialised to 0x00.")
+        _create_std_file(FILE_CHECKSUM, 4,          *r[FILE_CHECKSUM])
 
     def select_app(self, app_id: bytes = APP_ID):
         resp, sw1, sw2 = self._transmit(_apdu(INS_SELECT_APP, app_id[::-1]))
@@ -611,6 +617,7 @@ class CardService:
                             write_serial_key: bytes, key_number_serial: int,
                             write_type_key: bytes, key_number_type: int,
                             write_params_key: bytes, key_number_params: int,
+                            write_test_key: bytes, key_number_test: int,
                             write_chksum_key: bytes, key_number_chksum: int) -> None:
 
         def _auth(key_no, key):
@@ -645,8 +652,13 @@ class CardService:
             _auth(key_number_params, write_params_key)
         _write(FILE_PARAMS, card.params.encode())
 
-        # ── File 4 – Checksum ─────────────────────────────────────
-        if key_number_chksum != key_number_params:
+        # ── File 4 – Test ─────────────────────────────────────────
+        if key_number_test != key_number_params:
+            _auth(key_number_test, write_test_key)
+        _write(FILE_TEST, bytes([card.test_byte & 0xFF]))
+
+        # ── File 5 – Checksum ─────────────────────────────────────
+        if key_number_chksum != key_number_test:
             _auth(key_number_chksum, write_chksum_key)
         _write(FILE_CHECKSUM, struct.pack(">I", card.checksum))
 
