@@ -1,0 +1,14 @@
+# Build artifacts
+/dist/
+/build/
+*.spec
+
+# Build virtual environment
+/.venv-build/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+/.idea/
